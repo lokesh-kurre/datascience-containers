@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: default-container
+          env:
+            - name: JAVA_OPTS
+              value: "-Xmx1024m -Xms512m"
+          # resources:
+          #   limits:
+          #     memory: "128Mi"
+          #     cpu: "500m"
+          #   requests:
+          #     memory: "64Mi"
+          #     cpu: "250m"

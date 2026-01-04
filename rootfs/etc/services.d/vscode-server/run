@@ -1,0 +1,14 @@
+#!/command/execlineb -P
+with-contenv
+importas -S -D /home/jovyan SERVE_DIR
+importas -S -D "" VSCODE_GIT_HASH
+importas -S -D / NB_PREFIX
+execline-cd ${SERVE_DIR}
+# cert cert-key
+s6-setuidgid jovyan
+export HOME /home/jovyan
+backtick -n CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
+importas -S -D "" CLEANED_NB_PREFIX
+foreground { s6-echo "INFO: starting vscode-server..." }
+fdmove -c 2 1
+code serve-web --host 0.0.0.0 --port 8887 --without-connection-token --cli-data-dir /opt/vscode-web-server/cli --server-data-dir /opt/vscode-web-server/ --server-base-path "${CLEANED_NB_PREFIX}" --disable-telemetry --commit-id ${VSCODE_GIT_HASH} --default-folder ${SERVE_DIR} --socket-path /var/run/shared/vscode.sock

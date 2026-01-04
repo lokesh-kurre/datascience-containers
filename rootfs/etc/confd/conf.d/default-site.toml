@@ -1,0 +1,7 @@
+[template]
+src = "default-site.conf.tmpl"
+dest = "/etc/nginx/sites-enabled/default"
+
+owner = "root"
+group = "root"
+mode = "0644"

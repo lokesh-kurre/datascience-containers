@@ -1,0 +1,30 @@
+resources:
+  - ../base
+
+configMapGenerator:
+  - name: app-properties
+    behavior: merge
+    envs:
+      - application.properties
+
+namespace: default
+
+replicas:
+  - name: deployment
+    count: 3
+
+patches:
+  - path: service.patch.yaml
+  - path: deployment.patch.yaml
+
+replacements:
+  - source:
+      kind: Service
+      fieldPath: metadata.namespace
+    targets:
+      - select:
+          kind: ServiceMonitor
+        fieldPaths:
+          - spec.namespaceSelector.matchNames.0
+        options:
+          create: true

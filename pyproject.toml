@@ -1,0 +1,21 @@
+[project]
+name = "datascience-containers"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "build>=1.5.0",
+    "ipywidgets>=8.1.8",
+    "jupyter-contrib-nbextensions>=0.7.0",
+    "jupyter-tensorboard>=0.2.0",
+    "notebook==6.5.7",
+    "setuptools[core]==81.0.0",
+    "tensorboard",
+    "widgetsnbextension>=4.0.15",
+]
+
+[tool.uv.workspace]
+members = [
+    "jupyter_tensorboard",
+]

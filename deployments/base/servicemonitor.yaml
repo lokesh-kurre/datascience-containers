@@ -1,0 +1,12 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: servicemonitor
+  labels:
+    release: prometheus
+spec:
+  endpoints:
+  - port: monitoring
+    path: /metrics
+    interval: 30s               # How often Prometheus scrapes the targets
+    scrapeTimeout: 10s          # Time Prometheus waits for a response before timing out

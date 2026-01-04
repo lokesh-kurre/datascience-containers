@@ -1,0 +1,14 @@
+#!/command/execlineb -P
+with-contenv
+importas -S -D /home/jovyan SERVE_DIR
+importas -S -D / NB_PREFIX
+execline-cd ${SERVE_DIR}
+foreground { s6-rmrf /var/run/shared/jupyter.sock }
+s6-setuidgid jovyan
+export HOME /home/jovyan
+export VIRTUAL_ENV /opt/venv
+backtick -n CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
+importas -S -D "" CLEANED_NB_PREFIX
+foreground { s6-echo "INFO: starting notebook-server..." }
+fdmove -c 2 1
+uv run jupyter server --ServerApp.sock=/var/run/shared/notebook.sock --ServerApp.base_url="${CLEANED_NB_PREFIX}/notebook/"

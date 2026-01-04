@@ -1,0 +1,12 @@
+*.pyc
+*.egg-info
+*.swp
+
+.venv/
+
+temp
+vscode/
+
+.env
+certs/*
+!certs/generate.sh

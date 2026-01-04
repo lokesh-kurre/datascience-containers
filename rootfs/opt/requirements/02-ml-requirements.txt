@@ -1,0 +1,12 @@
+-r /opt/requirements/01-cpu-requirements.txt
+
+## ml packages
+xgboost
+catboost
+lightgbm
+statsmodels
+scikit-learn
+scikit-image
+
+onnx
+onnxruntime

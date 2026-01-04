@@ -1,0 +1,26 @@
+configMapGenerator:
+- name: app-properties
+  envs:
+  - config/application.properties
+- name: app-config
+  files:
+  - config/application.cfg
+
+configurations:
+  - kustomizeconfig.yaml
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app: default-app
+  env: production
+
+namePrefix: default-
+
+images:
+  - name: ubuntu:jammy
+    # newName: ubuntu
+    newTag: latest

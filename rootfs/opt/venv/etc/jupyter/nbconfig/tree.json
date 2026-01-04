@@ -1,0 +1,7 @@
+{
+    "load_extensions": {
+        "nbextensions_configurator/tree_tab/main": false,
+        "jupyter_tensorboard/tree": true,
+        "tree-filter/index": true
+    }
+}

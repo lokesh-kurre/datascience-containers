@@ -1,0 +1,5 @@
+#!/command/execlineb -P
+with-contenv
+foreground { s6-echo "INFO: starting Nginx..." }
+fdmove -c 2 1
+nginx -g "daemon off;"

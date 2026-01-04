@@ -1,0 +1,13 @@
+## disable installation of below packages
+jupyterlab==0
+qtconsole==0
+opencv-python-headless==0
+opencv-contrib-python==0
+opencv-python==0
+
+numpy==1.26.4
+opencv-contrib-python-headless==4.8.1.78
+
+### other packages
+onnx==1.15.0
+onnxruntime==1.18.1

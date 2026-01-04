@@ -1,0 +1,153 @@
+#!/command/with-contenv bash
+# s6-overlay init script
+
+set -euo pipefail
+
+echo "[cont-init] Configuring VS Code Server..."
+
+# --------------------------------------------------
+# Config
+# --------------------------------------------------
+
+VSCODE_DATA_DIR="${VSCODE_DATA_DIR:-/opt/vscode-web-server/data}"
+VSCODE_EXTENSIONS_DIR="${VSCODE_EXTENSIONS_DIR:-/opt/vscode-web-server/extensions}"
+
+FIX_VSCODE_PERMS_RECURSIVE="${FIX_VSCODE_PERMS_RECURSIVE:-0}"
+RESET_VSCODE_SETTINGS="${RESET_VSCODE_SETTINGS:-0}"
+
+SETTINGS_DIR="${VSCODE_DATA_DIR}/Machine"
+SETTINGS_FILE="${SETTINGS_DIR}/settings.json"
+
+
+# --------------------------------------------------
+# Create directories
+# --------------------------------------------------
+
+echo "[cont-init] Creating VS Code directories..."
+
+install -d \
+    -o jovyan \
+    -g shared \
+    -m 775 \
+    "${SETTINGS_DIR}" \
+    "${VSCODE_EXTENSIONS_DIR}" \
+    "${VSCODE_DATA_DIR}/logs" \
+    "${VSCODE_DATA_DIR}/User" \
+    "${VSCODE_DATA_DIR}/workspaceStorage"
+
+
+# --------------------------------------------------
+# Settings
+# --------------------------------------------------
+
+if [[ ! -f "${SETTINGS_FILE}" || "${RESET_VSCODE_SETTINGS}" == "1" ]]; then
+
+echo "[cont-init] Writing default settings.json"
+
+cat > "${SETTINGS_FILE}" << 'EOF'
+{
+    "workbench.colorTheme": "Light Modern",
+    "workbench.iconTheme": "vscode-icons",
+
+    "window.menuBarVisibility": "classic",
+
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.formatOnType": true,
+    "editor.wordWrap": "on",
+
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 2000,
+
+    "terminal.integrated.defaultProfile.linux": "bash",
+
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.terminal.useEnvFile": true,
+
+    "notebook.lineNumbers": "on",
+    "notebook.output.scrolling": true,
+    "notebook.output.wordWrap": true,
+
+    "git.confirmSync": false,
+
+    "extensions.autoCheckUpdates": false,
+    "extensions.autoUpdate": false,
+    "extensions.ignoreRecommendations": true,
+
+    "update.mode": "none",
+    "update.showReleaseNotes": false,
+
+    "telemetry.telemetryLevel": "off",
+    "telemetry.feedback.enabled": false,
+    "telemetry.editStats.enabled": false,
+
+    "gitlens.telemetry.enabled": false,
+    "gitlens.ai.enabled": false,
+
+    "marimo.telemetry": false,
+    "jsonFlow.enable": false
+}
+EOF
+
+fi
+
+
+# --------------------------------------------------
+# argv.json
+# --------------------------------------------------
+
+ARGV_FILE="${VSCODE_DATA_DIR}/argv.json"
+
+if [[ ! -f "${ARGV_FILE}" ]]; then
+
+cat > "${ARGV_FILE}" << 'EOF'
+{
+    "disable-hardware-acceleration": true,
+    "disable-telemetry": true
+}
+EOF
+
+fi
+
+
+# --------------------------------------------------
+# Permissions
+# --------------------------------------------------
+
+echo "[cont-init] Fixing permissions..."
+
+if [[ "${FIX_VSCODE_PERMS_RECURSIVE}" == "1" ]]; then
+
+    echo "[cont-init] recursive permission mode"
+
+    chown -R jovyan:shared \
+        "${VSCODE_DATA_DIR}" \
+        "${VSCODE_EXTENSIONS_DIR}"
+
+    chmod -R ug+rwX,o-rwx \
+        "${VSCODE_DATA_DIR}" \
+        "${VSCODE_EXTENSIONS_DIR}"
+
+else
+
+    echo "[cont-init] fast permission mode"
+
+    chown jovyan:shared \
+        "${VSCODE_DATA_DIR}" \
+        "${VSCODE_EXTENSIONS_DIR}" \
+        "${SETTINGS_FILE}" \
+        "${ARGV_FILE}" \
+        2>/dev/null || true
+
+    chmod ug+rwX,o-rwx \
+        "${VSCODE_DATA_DIR}" \
+        "${VSCODE_EXTENSIONS_DIR}" \
+        "${SETTINGS_FILE}" \
+        "${ARGV_FILE}" \
+        2>/dev/null || true
+
+fi
+
+
+echo "[cont-init] Configuring VS Code Server... Done"

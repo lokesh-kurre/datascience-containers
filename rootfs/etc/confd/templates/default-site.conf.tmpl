@@ -1,0 +1,147 @@
+server {
+
+{{ if and (fileExists "/etc/nginx/certs/server.crt") (fileExists "/etc/nginx/certs/server.key") }}
+
+    listen {{ getenv "SVC_PORT" "8888" }} ssl;
+
+    ssl_certificate     /etc/nginx/certs/server.crt;
+    ssl_certificate_key /etc/nginx/certs/server.key;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    # HTTP hitting HTTPS listener
+    error_page 497 =307 https://$http_host$request_uri;
+
+{{ else }}
+
+    listen {{ getenv "SVC_PORT" "8888" }};
+
+{{ end }}
+
+
+    server_name _;
+
+
+    client_max_body_size 0;
+
+    absolute_redirect off;
+    port_in_redirect off;
+    server_name_in_redirect off;
+
+
+    # ----------------------------
+    # Common proxy settings
+    # ----------------------------
+
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $http_host;
+
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Scheme $scheme;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+
+    proxy_buffering off;
+
+    proxy_read_timeout 86400;
+    proxy_send_timeout 86400;
+
+
+    # ----------------------------
+    # Health
+    # ----------------------------
+
+    location = /health {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+
+    # ----------------------------
+    # Files
+    # ----------------------------
+
+    location = {{ getenv "NB_PREFIX" "/" }}files {
+
+        return 302 {{ getenv "NB_PREFIX" "/" }}files/;
+
+    }
+
+
+    location {{ getenv "NB_PREFIX" "/" }}files/ {
+
+        alias {{ getenv "SERVE_DIR_ALIAS" "/home/jovyan/" }};
+
+        autoindex on;
+        autoindex_exact_size off;
+        autoindex_localtime on;
+
+    }
+
+
+    # ----------------------------
+    # ttyd
+    # ----------------------------
+
+    location {{ getenv "NB_PREFIX" "/" }}ttyd {
+
+        proxy_pass http://unix:/var/run/shared/ttyd.sock;
+
+    }
+
+
+    # ----------------------------
+    # Notebook
+    # ----------------------------
+
+    location = {{ getenv "NB_PREFIX" "/" }}notebook {
+
+        return 302 {{ getenv "NB_PREFIX" "/" }}notebook/;
+
+    }
+
+
+    location {{ getenv "NB_PREFIX" "/" }}notebook/ {
+
+        proxy_pass http://unix:/var/run/shared/notebook.sock;
+
+    }
+
+
+{{ if eq (getenv "ENABLE_CONNECT_PROXY" "1") "1" }}
+
+    # ----------------------------
+    # Connect proxy
+    #
+    # /connect/host:port/path
+    # ----------------------------
+
+    location ~ ^{{ getenv "NB_PREFIX_REGEX" "" }}/connect/([^/]+)/(.*)$ {
+
+        proxy_set_header Host $1;
+
+        proxy_pass http://$1/$2$is_args$args;
+
+    }
+
+{{ end }}
+
+
+    # ----------------------------
+    # VS Code fallback
+    # MUST remain last
+    # ----------------------------
+
+    location {{ getenv "NB_PREFIX" "/" }} {
+
+        proxy_pass http://unix:/var/run/shared/vscode.sock;
+
+    }
+
+}

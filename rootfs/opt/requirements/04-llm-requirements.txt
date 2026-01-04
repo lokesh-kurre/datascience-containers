@@ -1,0 +1,27 @@
+-r /opt/requirements/03-dl-requirements.txt
+
+### LLM and vector databases
+transformers
+tokenizers
+datasets
+accelerate
+huggingface-hub
+safetensors
+
+peft
+bitsandbytes
+einops
+sentencepiece
+vllm
+
+llama-cpp-python
+sentence-transformers
+evaluate
+rouge-score
+bert-score
+langchain-core
+langchain-community
+litellm
+anthropic
+google-generativeai
+rank-bm25

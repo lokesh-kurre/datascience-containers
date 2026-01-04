@@ -1,0 +1,21 @@
+{
+    "IdentityProvider": {
+        "token": "password"
+    },
+    "PasswordIdentityProvider": {
+        "hashed_password": ""
+    },
+    "ServerApp": {
+        "default_url": "/tree",
+        "disable_check_xsrf": true,
+        "open_browser": false,
+        "allow_remote_access": true,
+        "trust_xheaders": true,
+        "websocket_ping_interval": 30000,
+        "websocket_ping_timeout": 30000,
+        "allow_password_change": false
+    },
+    "NotebookApp": {
+        "show_banner": false
+    }
+}

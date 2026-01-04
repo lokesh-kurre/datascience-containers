@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: default-container
+        image: ubuntu:jammy
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http-port
+        - containerPort: 9090
+          protocol: TCP
+          name: monitoring
+        env:
+        - name: JAVA_OPTS
+          value: "-Xmx512m -Xms256m"
+        envFrom:
+        - configMapRef:
+            name: app-properties
+      volumes:
+      - name: app-properties
+        configMap:
+          name: app-properties
+      - name: app-config
+        configMap:
+          name: app-config

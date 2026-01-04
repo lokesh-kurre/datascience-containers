@@ -1,0 +1,22 @@
+#!/command/with-contenv bash
+
+set -e
+
+exec 2>&1
+
+WATCH_DIRS="/etc/nginx/conf.d /etc/nginx/sites-enabled /etc/nginx/certs"
+
+mkdir -p ${WATCH_DIRS}
+
+echo "[nginx-watch] watching"
+
+while true; do
+    inotifywait -qr \
+        -e close_write,create,delete,move \
+        ${WATCH_DIRS}
+
+    sleep 1
+
+    nginx -t > /dev/null && nginx -s reload || \
+        echo "[nginx-watch] invalid config ignored"
+done

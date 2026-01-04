@@ -1,0 +1,5 @@
+.venv
+deployments/
+docs/
+temp/
+vscode/

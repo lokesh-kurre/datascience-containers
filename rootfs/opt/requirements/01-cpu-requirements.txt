@@ -1,0 +1,14 @@
+numpy
+scipy
+pandas
+polars[rt64]
+orjson
+pyarrow
+rocksdict
+dask[complete]
+pillow
+
+opencv-contrib-python-headless
+
+scikit-learn
+scikit-image

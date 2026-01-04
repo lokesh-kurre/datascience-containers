@@ -1,0 +1,25 @@
+{
+    "jsonFlow.files.excludedFilePatterns": [
+        "**/.venv/**",
+        "**/graphify-out/**",
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/out/**",
+        "**/build/**",
+        "**/vendor/**"
+    ],
+    "makefile.configureOnOpen": false,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        // "**/.venv": true
+    },
+    "files.associations": {
+        "**/services.d/**": "shellscript",
+        "**/cont-init.d/**": "shellscript",
+        "**/s6-overlay/**": "shellscript"
+    }
+}
