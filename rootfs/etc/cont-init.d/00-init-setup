@@ -3,66 +3,55 @@
 
 set -euo pipefail
 
-
 echo "[cont-init] Starting environment setup..."
-
-
-# ==================================================
-# Config
-# ==================================================
 
 SERVE_DIR="${SERVE_DIR:-}"
 FIX_PERMS_RECURSIVE="${FIX_PERMS_RECURSIVE:-0}"
+HOME_DIR="/home/jovyan"
+GOLDEN_VENV="/opt/venv"
 
 echo "[cont-init] SERVE_DIR=${SERVE_DIR:-default}"
 echo "[cont-init] FIX_PERMS_RECURSIVE=${FIX_PERMS_RECURSIVE}"
-
-
 
 # ==================================================
 # Workspace / home mapping
 # ==================================================
 
+echo "[cont-init] Configuring home..."
+
 if [[ -n "${SERVE_DIR}" ]]; then
-
-    echo "[cont-init] Mapping /home/jovyan -> ${SERVE_DIR}"
-
     mkdir -p "${SERVE_DIR}"
 
-
-    if [[ -L /home/jovyan ]]; then
-
-        ln -sfn "${SERVE_DIR}" /home/jovyan
-
-
-    elif [[ ! -e /home/jovyan ]]; then
-
-        ln -sfn "${SERVE_DIR}" /home/jovyan
-
-
-    elif [[ -d /home/jovyan ]] &&
-         [[ -z "$(ls -A /home/jovyan 2>/dev/null)" ]]; then
-
-        rmdir /home/jovyan
-        ln -sfn "${SERVE_DIR}" /home/jovyan
-
-
+    if mountpoint -q "${HOME_DIR}"; then
+        echo "[cont-init] ${HOME_DIR} is mounted, keeping it"
     else
-
-        echo "[cont-init] Existing /home/jovyan detected, keeping it"
-
+        echo "[cont-init] Mapping ${HOME_DIR} -> ${SERVE_DIR}"
+        rm -rf "${HOME_DIR}"
+        ln -sfn "${SERVE_DIR}" "${HOME_DIR}"
     fi
-
 
     if [[ "${FIX_PERMS_RECURSIVE}" == "1" ]]; then
         chown -R jovyan:shared "${SERVE_DIR}"
     else
         chown jovyan:shared "${SERVE_DIR}" || true
     fi
-
 fi
 
+# ==================================================
+# VSCode server mapping
+# ==================================================
 
+echo "[cont-init] Configuring vscode server..."
+
+VSCODE_DIR="/opt/vscode-server"
+
+mkdir -p "${VSCODE_DIR}"
+
+rm -rf "${HOME_DIR}/.vscode-server"
+ln -sfn "${VSCODE_DIR}" "${HOME_DIR}/.vscode-server"
+
+rm -rf /root/.vscode-server
+ln -sfn "${VSCODE_DIR}" /root/.vscode-server
 
 # ==================================================
 # Home directories
@@ -70,41 +59,22 @@ fi
 
 echo "[cont-init] Preparing user directories..."
 
-
 for d in \
-    /home/jovyan/.local \
-    /home/jovyan/.config \
-    /home/jovyan/.cache \
-    /home/jovyan/.vscode-server
+    "${HOME_DIR}/.local" \
+    "${HOME_DIR}/.config" \
+    "${HOME_DIR}/.cache"
 do
-
-    install -d \
-        -o jovyan \
-        -g shared \
-        -m 755 \
-        "$d" || true
-
+    install -d -o jovyan -g shared -m 755 "$d" || true
 done
 
-
-
 # ==================================================
-# Global bash configuration
+# Global bash config
 # ==================================================
 
-echo "[cont-init] Installing /etc/bash.bashrc"
-
+echo "[cont-init] Installing bash configuration..."
 
 cat >/etc/bash.bashrc <<'EOF'
-
-# ==================================================
 # Global container bash config
-# ==================================================
-
-
-# -----------------------------
-# History
-# -----------------------------
 
 HISTCONTROL=ignoreboth:erasedups
 HISTSIZE=5000
@@ -113,101 +83,45 @@ HISTFILESIZE=10000
 shopt -s histappend
 shopt -s checkwinsize
 
-
-
-# -----------------------------
-# Virtual environment
-# -----------------------------
-
 export VIRTUAL_ENV_DISABLE_PROMPT=1
-
 
 if [ -z "${VIRTUAL_ENV:-}" ] &&
    [ -f /opt/venv/bin/activate ]; then
-
     source /opt/venv/bin/activate
-
 fi
 
-
-
-# -----------------------------
-# Environment banner
-# -----------------------------
-
 if [ -z "${_ENV_INFO_SHOWN:-}" ]; then
-
 export _ENV_INFO_SHOWN=1
-
 
 echo "--------------------------------------------------"
 echo "📦 Runtime Environment"
 echo "--------------------------------------------------"
 
-
 echo "OS         : $(lsb_release -ds 2>/dev/null || uname -a)"
 
-
 if command -v python >/dev/null 2>&1; then
-    echo "Python     : $(python --version 2>&1)"
-else
-    echo "Python     : unavailable"
+    echo "Python     : $(python --version)"
 fi
 
-
-echo "Venv       : ${VIRTUAL_ENV:-not active}"
-
+echo "Venv       : ${VIRTUAL_ENV:-none}"
 
 if command -v nvidia-smi >/dev/null 2>&1; then
-
-
-    echo "Driver     : $(nvidia-smi \
-        --query-gpu=driver_version \
-        --format=csv,noheader \
-        | head -n1)"
-
-
+    echo "Driver     : $(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n1)"
     echo "GPU(s)     :"
-
-
-    nvidia-smi \
-        --query-gpu=index,name,memory.total,memory.free \
-        --format=csv,noheader \
-        | sed 's/^/  - /'
-
-
+    nvidia-smi --query-gpu=index,name,memory.total,memory.free \
+        --format=csv,noheader | sed 's/^/  - /'
 else
-
     echo "CUDA       : not visible"
-
 fi
-
 
 echo "--------------------------------------------------"
-
-
 fi
-
-
-
-# -----------------------------
-# Aliases
-# -----------------------------
 
 if [ -x /usr/bin/dircolors ]; then
-
-
-    test -r ~/.dircolors &&
-        eval "$(dircolors -b ~/.dircolors)" ||
-        eval "$(dircolors -b)"
-
-
+    eval "$(dircolors -b)"
     alias ls='ls --color=auto'
     alias grep='grep --color=auto'
-
-
 fi
-
 
 alias l='ls -CF'
 alias la='ls -A'
@@ -220,169 +134,147 @@ alias duh='du -sh * 2>/dev/null'
 
 alias k='kubectl'
 
-
-
-# -----------------------------
-# Completion
-# -----------------------------
-
 if ! shopt -oq posix; then
-
-
     [ -f /usr/share/bash-completion/bash_completion ] &&
         source /usr/share/bash-completion/bash_completion
-
-
-    [ -f /etc/bash_completion ] &&
-        source /etc/bash_completion
-
-
 fi
 
-
-
-if command -v kubectl >/dev/null 2>&1; then
-
+command -v kubectl >/dev/null 2>&1 &&
     source <(kubectl completion bash 2>/dev/null)
 
-fi
-
-
-
-if command -v uv >/dev/null 2>&1; then
-
+command -v uv >/dev/null 2>&1 &&
     source <(uv generate-shell-completion bash 2>/dev/null)
 
-fi
-
-
 EOF
-
 
 chmod 644 /etc/bash.bashrc
 
-
-
 # ==================================================
-# Final prompt override
+# Prompt
 # ==================================================
 
-echo "[cont-init] Installing prompt config"
-
+echo "[cont-init] Installing prompt..."
 
 cat >/etc/container-prompt.sh <<'EOF'
 
-
-# ==================================================
-# Container prompt
-# ==================================================
-
-
-# -----------------------------
-# Git support
-# -----------------------------
-
-if [ -f /usr/lib/git-core/git-sh-prompt ]; then
+[ -f /usr/lib/git-core/git-sh-prompt ] &&
     source /usr/lib/git-core/git-sh-prompt
-elif [ -f /etc/bash_completion.d/git-prompt ]; then
-    source /etc/bash_completion.d/git-prompt
-fi
 
 export GIT_PS1_SHOWDIRTYSTATE=1
 export GIT_PS1_SHOWUNTRACKEDFILES=1
-export GIT_PS1_SHOWUPSTREAM="auto"
 
 fix_path() {
-    case $1 in
-        "$HOME"*)
-            printf "~%s" "${1#$HOME}"
-            ;;
-        *)
-            printf "%s" "$1"
-            ;;
+    case "$1" in
+        "$HOME"*) printf "~%s" "${1#$HOME}" ;;
+        *) printf "%s" "$1" ;;
     esac
 }
 
-prompt_path() {
+prompt_venv() {
     if [ -n "${VIRTUAL_ENV:-}" ]; then
-        printf "(%s) " $(fix_path "$VIRTUAL_ENV")
+        printf "(%s)" "$(fix_path "$VIRTUAL_ENV")"
     fi
-    printf "%s" $(fix_path "$PWD")
 }
 
-
+prompt_path() {
+    fix_path "$PWD"
+}
 
 prompt_git() {
-    if declare -F __git_ps1 >/dev/null; then
+    declare -F __git_ps1 >/dev/null &&
         __git_ps1 " git:(%s)"
-    fi
 }
 
-case "$TERM" in
-    *256color*)
-        PS1='\[\033[01;35m\]$(prompt_path)\[\033[00m\] \n ➜ \[\033[01;32m\]\u@\h\[\033[00m\]\[\033[01;33m\]$(prompt_git)\[\033[00m\] '
-        ;;
-    *)
-        PS1='$(prompt_path)\n ➜ \u@\h$(prompt_git) '
-        ;;
-esac
-
-case "$TERM" in
-xterm*|rxvt*)
-    PS1="\[\e]0;\u@\h: \w\a\]$PS1"
-    ;;
-esac
-
+PS1='\[\033[01;36m\]$(prompt_venv)\[\033[00m\] \[\033[01;35m\]$(prompt_path)\[\033[00m\]
+ ➜ \[\033[01;32m\]\u@\h\[\033[00m\]\[\033[01;33m\]$(prompt_git)\[\033[00m\] '
 
 EOF
-
 
 chmod 644 /etc/container-prompt.sh
 
-
-
 # ==================================================
-# Patch user bashrc
+# User bashrc
 # ==================================================
 
-echo "[cont-init] Patching user bashrc"
+echo "[cont-init] Patching user bashrc..."
 
+USER_BASHRC="${HOME_DIR}/.bashrc"
 
-USER_BASHRC=/home/jovyan/.bashrc
-
-
-touch "$USER_BASHRC"
-
-
-# Remove old managed block
+touch "${USER_BASHRC}"
 
 sed -i \
 '/# >>> CONTAINER_PROMPT >>>/,/# <<< CONTAINER_PROMPT <<</d' \
-"$USER_BASHRC"
+"${USER_BASHRC}"
 
-
-
-cat >> "$USER_BASHRC" <<'EOF'
-
+cat >>"${USER_BASHRC}" <<'EOF'
 
 # >>> CONTAINER_PROMPT >>>
-
-# Always last: container owns final prompt
-
-if [ -f /etc/container-prompt.sh ]; then
+[ -f /etc/container-prompt.sh ] &&
     source /etc/container-prompt.sh
-fi
-
 # <<< CONTAINER_PROMPT <<<
-
 
 EOF
 
+chown jovyan:shared "${USER_BASHRC}"
+chmod 644 "${USER_BASHRC}"
 
+# ==================================================
+# uv wrapper
+# ==================================================
 
-chown jovyan:shared "$USER_BASHRC"
-chmod 644 "$USER_BASHRC"
+echo "[cont-init] Configuring uv wrapper..."
 
+if [[ -x /usr/local/bin/uv && ! -x /usr/local/bin/uv.real ]]; then
+    mv /usr/local/bin/uv /usr/local/bin/uv.real
 
+cat >/usr/local/bin/uv <<'EOF'
+#!/usr/bin/env bash
+
+GOLDEN_VENV="/opt/venv"
+CMD="$(basename "$0")"
+
+if [[ "$CMD" == "uvx" ]]; then
+    unset UV_CONSTRAINT
+elif [[ "${VIRTUAL_ENV:-}" == "$GOLDEN_VENV" ]]; then
+    export UV_CONSTRAINT="$GOLDEN_VENV/pinned"
+else
+    unset UV_CONSTRAINT
+fi
+
+exec /usr/local/bin/uv.real "$@"
+EOF
+
+    chmod +x /usr/local/bin/uv
+    ln -sfn /usr/local/bin/uv /usr/local/bin/uvx
+fi
+
+# ==================================================
+# pip wrapper
+# ==================================================
+
+echo "[cont-init] Configuring pip wrapper..."
+
+if [[ -x "${GOLDEN_VENV}/bin/pip" &&
+      ! -x "${GOLDEN_VENV}/bin/pip.real" ]]; then
+
+    mv "${GOLDEN_VENV}/bin/pip" \
+       "${GOLDEN_VENV}/bin/pip.real"
+
+cat >"${GOLDEN_VENV}/bin/pip" <<'EOF'
+#!/usr/bin/env bash
+
+GOLDEN_VENV="/opt/venv"
+
+if [[ "${VIRTUAL_ENV:-}" == "$GOLDEN_VENV" ]]; then
+    export PIP_CONSTRAINT="$GOLDEN_VENV/pinned"
+else
+    unset PIP_CONSTRAINT
+fi
+
+exec "$GOLDEN_VENV/bin/pip.real" "$@"
+EOF
+
+    chmod +x "${GOLDEN_VENV}/bin/pip"
+fi
 
 echo "[cont-init] Environment setup complete."

@@ -30,7 +30,7 @@ version:
 build-vscode-web:
 	docker build --progress plain \
 		$(shell awk '!/^#/ && NF { gsub(/[ \t]*=[ \t]*/, "="); gsub(/#.*$$/, ""); print "--build-arg", $$0 }' build_arg.properties) \
-		-t lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION) -f dists/vscode-web/Dockerfile .
+		-t lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION)-runtime -f dists/vscode-web/Dockerfile .
 
 stop-vscode-web:
 	docker stop test-vscode-web || true
@@ -38,4 +38,4 @@ stop-vscode-web:
 run-vscode-web: stop-vscode-web
 	docker run -it --rm --net=host \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		--name test-vscode-web $(ARGS) lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION) $(CMD)
+		--name test-vscode-web $(ARGS) lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION)-runtime $(CMD)

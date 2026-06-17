@@ -154,10 +154,9 @@ USER root
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autotools-dev gdb libc6-dbg gfortran libboost-all-dev libeigen3-dev \
-    libicu-dev libbz2-dev zlib1g-dev libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
-    graphviz poppler-utils tesseract-ocr libtesseract-dev ghostscript antiword unrtf \
-    libpq-dev librdkafka-dev libxml2 libxslt1.1 pciutils \
-    ninja-build build-essential \
+    libicu-dev libbz2-dev zlib1g-dev pciutils libffi-dev libssl-dev \
+    build-essential gcc g++ make cmake ninja-build pkg-config python3-dev \
+    libncurses-dev libreadline-dev libsqlite3-dev liblzma-dev ccache patchelf \
     && rm -rf /var/lib/apt/lists/*
 
 USER jovyan
@@ -224,6 +223,15 @@ RUN --mount=type=cache,target=/root/.cache/uv echo "-c /opt/requirements/00-cons
 RUN find /etc/cont-init.d/ /etc/services.d/ -type f -exec chmod +x {} +
 
 ENTRYPOINT ["/init"]
+
+FROM base-python-codeserver-jupyter AS final
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 libgomp1 libquadmath0 libstdc++6 libgcc-s1 libopenblas0 liblapack3 libjpeg-turbo8 libpng16-16 \
+    ffmpeg libsm6 libxext6 libxrender1 libfontconfig1 libfreetype6 libffi8 libssl3  \
+    && rm -rf /var/lib/apt/lists/*
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsSL "http://127.0.0.1:${SVC_PORT:-8888}/health" || exit 1
