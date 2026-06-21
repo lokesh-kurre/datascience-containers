@@ -2,11 +2,13 @@
 with-contenv
 importas -S -D /home/jovyan SERVE_DIR
 importas -S -D / NB_PREFIX
+importas -S -D /opt/venv VIRTUAL_ENV
 execline-cd ${SERVE_DIR}
 foreground { s6-rmrf /var/run/shared/jupyter.sock }
-s6-setuidgid jovyan
+backtick -n GIDLIST { id -G }
+s6-envuidgid -B -i jovyan:shared
+s6-applyuidgid -z -U
 export HOME /home/jovyan
-export VIRTUAL_ENV /opt/venv
 backtick -n CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
 importas -S -D "" CLEANED_NB_PREFIX
 foreground { s6-echo "INFO: starting notebook-server..." }

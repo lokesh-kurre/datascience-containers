@@ -3,8 +3,9 @@ with-contenv
 importas -S -D /home/jovyan SERVE_DIR
 importas -S -D / NB_PREFIX
 execline-cd ${SERVE_DIR}
-# cert cert-key
-s6-setuidgid jovyan
+backtick -n GIDLIST { id -G }
+s6-envuidgid -B -i jovyan:shared
+s6-applyuidgid -z -U
 export HOME /home/jovyan
 backtick -n CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
 importas -S -D "" CLEANED_NB_PREFIX
