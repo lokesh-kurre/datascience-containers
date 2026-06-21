@@ -1,41 +1,82 @@
+TARGET ?= final
+BUILD_TYPE ?= cpu
 
-CMD := 
-UV_ENV_FILE := .env
+CMD :=
+ARGS :=
 
 include build_arg.properties
 
-.PHONY: help version clean build run start-jupyter-server venv-setup start-code code build-vscode-web run-vscode-web
 
-help:
-	@echo "Targets:"
-	@echo "  make version           Show pinned VS Code/build values"
-	@echo "  make build             Build base notebook image"
-	@echo "  make run               Run base notebook image"
-	@echo "  make build-vscode-web  Build VS Code web image using build_arg.properties"
-	@echo "  make run-vscode-web    Run VS Code web image"
-	@echo "  make clean             Remove local test container"
-	@echo ""
-	@echo "Notes:"
-	@echo "  - Override values with: make build-vscode-web VSCODE_VERSION=1.124.2"
-	@echo "  - Arbitrary docker flags: make run-vscode-web ARGS='-e NB_PREFIX=/vscode'"
+GIT_REPO := $(shell git config --get remote.origin.url)
+GIT_COMMIT := $(shell git rev-parse HEAD)
+GIT_BRANCH := $(shell git branch --show-current)
+GIT_DIRTY := $(shell test -n "$$(git status --porcelain)" && echo true || echo false)
+BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+VERSION := $(shell git describe --tags --always --dirty)
+
+
+IMAGE_NAME := lokeshkurre/vscode-web
+
+ifeq ($(BUILD_TYPE),gpu)
+IMAGE_TAG := ubuntu$(UBUNTU_VERSION)-py$(PYTHON_VERSION)-vscode$(VSCODE_VERSION)-cuda$(CUDA_MAJOR).$(CUDA_MINOR)
+else
+IMAGE_TAG := ubuntu$(UBUNTU_VERSION)-py$(PYTHON_VERSION)-vscode$(VSCODE_VERSION)-cpu
+endif
+
+IMAGE := $(IMAGE_NAME):$(IMAGE_TAG)
+
+
+BUILD_ARGS := $(shell awk '\
+	!/^#/ && NF { \
+	print "--build-arg", $$0 \
+	}' build_arg.properties)
+
+
+.PHONY: version build build-cpu build-gpu run
+
 
 version:
-	@echo "Build Mode:" $(BUILD_MODE)
-	@echo "VSCode Version:" $(VSCODE_VERSION)
-	@echo "VSCode Git Hash:" $(VSCODE_GIT_HASH)
-	@echo "Ubuntu Version:" $(UBUNTU_VERSION)
-	@echo "Python Version:" $(PYTHON_VERSION)
+	@echo "Image:       $(IMAGE)"
+	@echo "Target:      $(TARGET)"
+	@echo "Build Type:  $(BUILD_TYPE)"
+	@echo "Commit:      $(GIT_COMMIT)"
+	@echo "Version:     $(VERSION)"
+	@echo "Dirty:       $(GIT_DIRTY)"
 
 
-build-vscode-web:
-	docker build --progress plain \
-		$(shell awk '!/^#/ && NF { gsub(/[ \t]*=[ \t]*/, "="); gsub(/#.*$$/, ""); print "--build-arg", $$0 }' build_arg.properties) \
-		-t lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION)-runtime -f dists/vscode-web/Dockerfile .
+build:
+	docker build \
+		--progress plain \
+		--target $(TARGET) \
+		--build-arg BUILD_TYPE=$(BUILD_TYPE) \
+		--build-arg GIT_REPO="$(GIT_REPO)" \
+		--build-arg GIT_COMMIT="$(GIT_COMMIT)" \
+		--build-arg GIT_BRANCH="$(GIT_BRANCH)" \
+		--build-arg GIT_DIRTY="$(GIT_DIRTY)" \
+		--build-arg BUILD_DATE="$(BUILD_DATE)" \
+		--build-arg VERSION="$(VERSION)" \
+		$(BUILD_ARGS) \
+		-t $(IMAGE) \
+		-f dists/vscode-web/Dockerfile \
+		.
 
-stop-vscode-web:
-	docker stop test-vscode-web || true
 
-run-vscode-web: stop-vscode-web
-	docker run -it --rm --net=host \
+build-cpu:
+	$(MAKE) build \
+		BUILD_TYPE=cpu
+
+
+build-gpu:
+	$(MAKE) build \
+		BUILD_TYPE=gpu
+
+
+run:
+	docker run \
+		-it \
+		--rm \
+		--net=host \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		--name test-vscode-web $(ARGS) lokeshkurre/vscode-web:ubuntu$(UBUNTU_VERSION)-vscode$(VSCODE_VERSION)-py$(PYTHON_VERSION)-runtime $(CMD)
+		$(ARGS) \
+		$(IMAGE) \
+		$(CMD)

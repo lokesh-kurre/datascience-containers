@@ -3,7 +3,8 @@
         "token": "password"
     },
     "PasswordIdentityProvider": {
-        "hashed_password": ""
+        "hashed_password": "",
+        "allow_password_change": false
     },
     "ServerApp": {
         "default_url": "/tree",
@@ -12,8 +13,7 @@
         "allow_remote_access": true,
         "trust_xheaders": true,
         "websocket_ping_interval": 30000,
-        "websocket_ping_timeout": 30000,
-        "allow_password_change": false
+        "websocket_ping_timeout": 30000
     },
     "NotebookApp": {
         "show_banner": false

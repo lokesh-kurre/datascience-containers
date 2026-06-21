@@ -1,135 +1,513 @@
 # AIML Golden Notebook Image
 
-This repository builds the **golden, pinned, GPU-enabled Jupyter notebook image**
-used across AIML projects.
+Golden developer notebook container used across AIML projects.
 
-The image is:
-- CUDA **12.2** (runtime, cuDNN 8)
-- Python **3.10.13** (via `uv`)
-- Fully pinned ML / DL / CV stack (Torch, TensorFlow, ONNX, OpenCV, FAISS, etc.)
-- JupyterLab-based, Kubeflow / JupyterHub compatible
-- Debug-friendly (faulthandler + core dumps)
-- Reproducible and Harbor-ready
+The image provides a stable ML engineering environment with:
+
+- Ubuntu base image
+- Python managed by `uv`
+- VS Code Web
+- Jupyter Notebook
+- Docker/Kubernetes tooling
+- Data engineering libraries
+- Scientific Python stack
+- Optional CUDA development layer
+
+This image is designed as a **platform image**, not a project dependency bundle.
+
+Project-specific dependencies such as:
+
+- PyTorch
+- TensorFlow
+- JAX
+- Transformers
+- vLLM
+- DeepSpeed
+
+should live inside project virtual environments.
 
 ---
-## Tagging Convention
 
-Tags must be **explicit and immutable**, and folder inside `dists`.
-
-Recommended format:
-```
-cuda12.2-py3.10-tf2.15-torch2.1.2-faiss1.9.0.0
-```
-
-Rules:
-- Do NOT use `latest`
-- Do NOT retag existing images
-- New build = new tag
-
-
-## Build Requirements
-
-- Docker Engine **24.0.x**
-- NVIDIA Container Runtime
-- Git access to this repository
-- Network access to:
-  - PyPI
-  - PyTorch CUDA wheel index
-  - Docker Registry
-
-
-## Build Command (GitHub / CI)
-
-Run from the **repository root**:
-
-```bash
-docker build
-  -t lokeshkurre/notebooks:cuda12.2-py3.10-tf2.15-torch2.1.2-faiss1.9.0.0 \
-  -f dists/cuda12.2-py3.10-tf2.15-torch2.1.2-faiss1.9.0.0/Dockerfile .
-```
-
-## Push to Registry
-```
-docker push lokeshkurre/notebooks:cuda12.2-py3.10-tf2.15-torch2.1.2-faiss1.9.0.0
-```
-
-## Runtime Validation
-
-Run inside a notebook terminal:
-```
-nvidia-smi
-python -c "import torch; print(torch.cuda.is_available())"
-python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
-python -c "import cv2; print(cv2.__version__)"
-```
-
-On shell startup, the image also prints:
-- OS version
-- Python + virtualenv info
-- GPU visibility
-- Torch / TensorFlow / ONNX Runtime status
-
-## Important Notes
-
-- CUDA is pinned via base image
-  - Do NOT install or upgrade CUDA via apt, conda, or pip
-- All Python dependencies are pinned via constraints
-- Any dependency change requires a new image tag
-- This image is infrastructure, not a project sandbox
-
-## VS Code Web Distribution
-
-This repository also includes a VS Code browser-serving image in:
+# Architecture
 
 ```text
-dists/vscode-web/
+ubuntu
+  |
+  +-- base tools
+        |
+        +-- python + uv
+              |
+              +-- vscode + jupyter
+                    |
+                    +-- final-cpu
+                          |
+                          +-- final-gpu
+                                |
+                                +-- CUDA headers
+                                +-- nvcc
+                                +-- nvrtc
+                                +-- build libraries
 ```
 
-It uses `s6-overlay` services and starts VS Code via `code serve-web` behind nginx.
+CPU and GPU images share all common Docker layers.
 
-Default pinned values in that distro:
+The GPU image only adds CUDA compilation support.
 
-- `VSCODE_VERSION=1.124.2`
-- `VSCODE_GIT_HASH=6928394f91b684055b873eecb8bc281365131f1c`
+---
 
-Build argument source:
+# Image Variants
 
-- `build_arg.properties` holds Docker build args used by the local build flow.
-- `make build-vscode-web` reads this file and expands each entry as `--build-arg KEY=VALUE`.
-- Keep entries as plain `KEY=VALUE` lines (inline comments are allowed).
+## CPU Image
 
-Build example:
+Docker target:
+
+```text
+final-cpu
+```
+
+Includes:
+
+- Python
+- uv
+- Jupyter
+- VS Code Web
+- build tools
+- OpenCV CPU
+- NumPy/SciPy ecosystem
+- database clients
+- cloud SDKs
+- profiling utilities
+
+---
+
+## GPU Image
+
+Docker target:
+
+```text
+final-gpu
+```
+
+Extends:
+
+```text
+final-cpu
+```
+
+Additional CUDA packages:
+
+```text
+cuda-minimal-build
+cuda-cudart-dev
+cuda-nvrtc-dev
+cuda-nvml-dev
+libcublas-dev
+libcusparse-dev
+libcurand-dev
+libcusolver-dev
+```
+
+Provides:
+
+- CUDA headers
+- nvcc compiler
+- CUDA extension builds
+- custom CUDA kernel compilation
+
+The image intentionally does not globally install:
+
+- torch
+- tensorflow
+- jax
+- transformers
+
+Framework CUDA runtimes are managed by project environments.
+
+Example:
+
+```bash
+uv pip install torch
+```
+
+PyTorch manages its own:
+
+- CUDA runtime
+- cuDNN
+- NCCL
+- CUDA libraries
+
+---
+
+# Build Configuration
+
+Build arguments are stored in:
+
+```text
+build_arg.properties
+```
+
+Example:
+
+```properties
+UBUNTU_VERSION=22.04
+
+PYTHON_VERSION=3.11
+
+VSCODE_VERSION=1.125.1
+VSCODE_GIT_HASH=fcf604774b9f2674b473065736ee75077e256353
+
+S6_OVERLAY_VERSION=3.2.3.0
+
+CUDA_MAJOR=12
+CUDA_MINOR=2
+```
+
+Keep format:
+
+```text
+KEY=VALUE
+```
+
+---
+
+# Build
+
+## CPU
+
+```bash
+make build-cpu
+```
+
+Image:
+
+```text
+lokeshkurre/vscode-web:ubuntu22.04-py3.11-cpu
+```
+
+---
+
+## GPU
+
+```bash
+make build-gpu
+```
+
+Image:
+
+```text
+lokeshkurre/vscode-web:ubuntu22.04-py3.11-cuda12.2
+```
+
+---
+
+# Manual Docker Build
+
+CPU:
 
 ```bash
 docker build \
-  -t lokeshkurre/notebooks:vscode-web-1.124.2 \
+  --target final-cpu \
+  -t notebook:cpu \
   -f dists/vscode-web/Dockerfile .
 ```
 
-Makefile shortcut:
+GPU:
 
 ```bash
-make build-vscode-web
+docker build \
+  --target final-gpu \
+  -t notebook:gpu \
+  -f dists/vscode-web/Dockerfile .
 ```
 
-Optional build args:
+---
+
+# Tagging Convention
+
+Images use explicit immutable tags.
+
+Format:
+
+```text
+ubuntu<version>-py<version>-<variant>
+```
+
+Examples:
+
+CPU:
+
+```text
+ubuntu22.04-py3.11-cpu
+```
+
+GPU:
+
+```text
+ubuntu22.04-py3.11-cuda12.2
+```
+
+Rules:
+
+- Do not use `latest`
+- Do not overwrite released tags
+- Dependency baseline change requires a new tag
+
+---
+
+# Build Metadata
+
+Images contain OCI labels.
+
+Standard labels:
+
+```text
+org.opencontainers.image.source
+org.opencontainers.image.revision
+org.opencontainers.image.created
+org.opencontainers.image.version
+```
+
+Platform labels:
+
+```text
+ai.platform.cuda.enabled
+ai.platform.cuda.version
+ai.platform.cuda.mode
+```
+
+Inspect:
 
 ```bash
---build-arg BUILD_TYPE=gpu \
---build-arg BUILD_MODE=dev \
---build-arg VSCODE_VERSION=1.124.2 \
---build-arg VSCODE_GIT_HASH=6928394f91b684055b873eecb8bc281365131f1c
+docker inspect IMAGE \
+  --format '{{json .Config.Labels}}' | jq
 ```
 
-Runtime behavior:
+Example:
 
-- VS Code web server listens on `8887` internally.
-- nginx fronts services on `${SVC_PORT:-8888}` with `${NB_PREFIX:-/}` routing.
-- Base path is passed through `--server-base-path` from normalized `NB_PREFIX`.
-- VS Code extensions are preinstalled from `dists/vscode-web/vscode-extensions.txt`.
-- Connect proxy (`${NB_PREFIX}/connect/<ip:port>/<path>`) is gated by `ENABLE_CONNECT_PROXY` (default: `1`). Set `ENABLE_CONNECT_PROXY=0` to disable it.
-- nginx TLS policy is `TLSv1.2 TLSv1.3`.
+```json
+{
+  "org.opencontainers.image.revision": "a91bc22",
+  "ai.platform.cuda.enabled": "true",
+  "ai.platform.cuda.version": "12.2",
+  "ai.platform.cuda.mode": "compile-only"
+}
+```
 
-For detailed internals and upgrade steps, see:
+---
 
-- `docs/serve-vscode-on-web.md`
+# Runtime
+
+## CPU
+
+```bash
+docker run \
+  -it \
+  --rm \
+  lokeshkurre/vscode-web:ubuntu22.04-py3.11-cpu
+```
+
+---
+
+## GPU
+
+```bash
+docker run \
+  -it \
+  --rm \
+  --gpus all \
+  lokeshkurre/vscode-web:ubuntu22.04-py3.11-cuda12.2
+```
+
+---
+
+# GPU Validation
+
+Driver:
+
+```bash
+nvidia-smi
+```
+
+CUDA compiler:
+
+```bash
+nvcc --version
+```
+
+Framework test:
+
+```bash
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+---
+
+# Python Environment Strategy
+
+## Base Environment
+
+Location:
+
+```text
+/opt/venv
+```
+
+Contains stable tooling:
+
+- Jupyter
+- VS Code helpers
+- debugging utilities
+- data libraries
+- infrastructure clients
+
+Examples:
+
+```text
+numpy
+scipy
+pandas
+polars
+opencv
+sklearn
+dask
+boto3
+fastapi
+sql clients
+```
+
+---
+
+# Project Environments
+
+Create isolated environments per project.
+
+Example:
+
+```bash
+cd my-project
+
+uv venv
+
+source .venv/bin/activate
+```
+
+Install ML frameworks:
+
+```bash
+uv pip install torch transformers
+```
+
+Project-specific:
+
+```text
+torch
+tensorflow
+jax
+transformers
+accelerate
+vllm
+flash-attn
+deepspeed
+bitsandbytes
+```
+
+---
+
+# VS Code Web
+
+VS Code browser environment included.
+
+Runs:
+
+```text
+code serve-web
+```
+
+Architecture:
+
+```text
+browser
+   |
+ nginx
+   |
+ VS Code Web
+```
+
+Defaults:
+
+```text
+VS Code port : 8887
+Public port  : ${SVC_PORT:-8888}
+Base path    : ${NB_PREFIX:-/}
+```
+
+Features:
+
+- preinstalled extensions
+- notebook support
+- persistent server cache
+- reverse proxy support
+
+Configuration:
+
+```text
+NB_PREFIX
+SVC_PORT
+ENABLE_CONNECT_PROXY
+```
+
+---
+
+# Upgrade Policy
+
+Safe updates:
+
+- VS Code version
+- Python patch version
+- notebook tooling
+- CPU utilities
+
+Require new image tag:
+
+- CUDA version changes
+- Python minor version changes
+- dependency baseline changes
+
+Do not upgrade CUDA manually:
+
+```bash
+apt upgrade cuda*
+```
+
+CUDA packages are pinned:
+
+```bash
+apt-mark hold
+```
+
+---
+
+# Design Principle
+
+The container provides:
+
+```text
+stable operating environment
+            +
+developer tooling
+            +
+CUDA build capability
+```
+
+Projects provide:
+
+```text
+ML frameworks
+experiments
+model dependencies
+runtime choices
+```
+
+The platform stays boring.
+
+The projects are allowed to be chaotic.
