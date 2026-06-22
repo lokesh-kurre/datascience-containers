@@ -3,6 +3,7 @@ with-contenv
 importas -S -D /home/jovyan SERVE_DIR
 importas -S -D / NB_PREFIX
 execline-cd ${SERVE_DIR}
+foreground { s6-rmrf /var/run/shared/ttyd.sock }
 backtick -n GIDLIST { id -G }
 s6-envuidgid -B -i jovyan:shared
 s6-applyuidgid -z -U
