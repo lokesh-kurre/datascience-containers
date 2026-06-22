@@ -8,6 +8,7 @@ imgildev.vscode-json-flow
 james-yu.latex-workshop
 jeff-hykin.better-cpp-syntax
 marimo-team.vscode-marimo
+mathematic.vscode-pdf
 mechatroner.rainbow-csv
 mhutchie.git-graph
 ms-azuretools.vscode-containers

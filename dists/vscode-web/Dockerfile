@@ -73,6 +73,36 @@ ENTRYPOINT [ "/usr/bin/tini", "--" ]
 CMD [ "/bin/bash" ]
 
 # =============================================================================================================
+FROM base AS cuda-builder
+
+ARG CUDA_MAJOR
+ARG CUDA_MINOR
+ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}
+ARG CUDA_PKG_VERSION=${CUDA_MAJOR}-${CUDA_MINOR}
+
+USER root
+
+RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    -O /tmp/cuda-keyring.deb \
+    && dpkg -i /tmp/cuda-keyring.deb \
+    && rm /tmp/cuda-keyring.deb
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    CUDA_PACKAGES="\
+    cuda-minimal-build-${CUDA_PKG_VERSION} \
+    cuda-cudart-dev-${CUDA_PKG_VERSION} \
+    cuda-nvrtc-dev-${CUDA_PKG_VERSION} \
+    cuda-nvml-dev-${CUDA_PKG_VERSION} \
+    libcublas-dev-${CUDA_PKG_VERSION} \
+    libcusparse-dev-${CUDA_PKG_VERSION} \
+    libcurand-dev-${CUDA_PKG_VERSION} \
+    libcusolver-dev-${CUDA_PKG_VERSION}" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ${CUDA_PACKAGES} \
+    && apt-mark hold ${CUDA_PACKAGES}
+
+# =============================================================================================================
 FROM base AS base-python
 
 ARG PYTHON_VERSION
@@ -112,7 +142,7 @@ ENV VIRTUAL_ENV_DISABLE_PROMPT=1 \
     OPENBLAS_NUM_THREADS=1 \
     NUMEXPR_NUM_THREADS=1
 
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000 \
+RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000 \
     DEPS="opencv-python-headless==0 opencv-contrib-python==0 opencv-python==0" \
     && VIRTUAL_ENV=/opt/venv uv venv /opt/venv --python "${PYTHON_VERSION}" \
     && touch /opt/venv/pinned \
@@ -128,7 +158,7 @@ RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000 \
 CMD [ "/bin/bash", "--login" ]
 
 # =============================================================================================================
-FROM base-python AS base-python-codeserver-jupyter-cpu
+FROM base-python AS base-python-codeserver-jupyter
 
 ARG VSCODE_VERSION
 ARG VSCODE_GIT_HASH
@@ -167,7 +197,7 @@ RUN DEPS="setuptools[core]<81.0.0 build wheel pip" \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 COPY dists/vscode-web/notebook-extensions.txt /opt/notebook-data/extensions.list
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000  \
+RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000  \
     DEPS="notebook==6.5.7" \
     && UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv \
     uv pip install --no-build-isolation \
@@ -179,58 +209,7 @@ RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000  \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 # =============================================================================================================
-FROM base-python-codeserver-jupyter-cpu AS base-python-codeserver-jupyter-gpu
-
-ARG CUDA_MAJOR
-ARG CUDA_MINOR
-ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}
-ARG CUDA_PKG_VERSION=${CUDA_MAJOR}-${CUDA_MINOR}
-
-USER root
-
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
-    -O /tmp/cuda-keyring.deb \
-    && dpkg -i /tmp/cuda-keyring.deb \
-    && rm /tmp/cuda-keyring.deb
-
-
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-    CUDA_PACKAGES="\
-    cuda-minimal-build-${CUDA_PKG_VERSION} \
-    cuda-cudart-dev-${CUDA_PKG_VERSION} \
-    cuda-nvrtc-dev-${CUDA_PKG_VERSION} \
-    cuda-nvml-dev-${CUDA_PKG_VERSION} \
-    libcublas-dev-${CUDA_PKG_VERSION} \
-    libcusparse-dev-${CUDA_PKG_VERSION} \
-    libcurand-dev-${CUDA_PKG_VERSION} \
-    libcusolver-dev-${CUDA_PKG_VERSION}" \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends ${CUDA_PACKAGES} \
-    && apt-mark hold ${CUDA_PACKAGES}
-
-
-ENV CUDA_HOME=/usr/local/cuda-${CUDA_VERSION}
-ENV CUDA_PATH=${CUDA_HOME}
-
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-
-ENV LIBRARY_PATH=${CUDA_HOME}/lib64/stubs:${LIBRARY_PATH}
-
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
-LABEL ai.platform.cuda.enabled="true" \
-    ai.platform.cuda.version="${CUDA_VERSION}" \
-    ai.platform.cuda.mode="compile-only" \
-    ai.platform.cuda.components="nvcc,headers,nvrtc,nvml"
-
-RUN nvcc --version
-
-# =============================================================================================================
-FROM base-python-codeserver-jupyter-${BUILD_TYPE} AS final
+FROM base-python-codeserver-jupyter AS base-python-codeserver-jupyter-cpu
 
 USER root
 
@@ -247,6 +226,52 @@ ENTRYPOINT ["/init"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsSL "http://127.0.0.1:${SVC_PORT:-8888}/health" || exit 1
 
+
+# =============================================================================================================
+FROM base-python-codeserver-jupyter-cpu AS base-python-codeserver-jupyter-gpu
+
+ARG CUDA_MAJOR=12
+ARG CUDA_MINOR=2
+ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}
+
+COPY --from=cuda-builder /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_VERSION}
+
+RUN ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda && \
+    ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_MAJOR}
+
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV CUDAToolkit_ROOT=/usr/local/cuda
+
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${CUDA_HOME}/targets/x86_64-linux/lib/stubs
+ENV LIBRARY_PATH=${CUDA_HOME}/targets/x86_64-linux/lib/stubs:${LIBRARY_PATH}
+
+RUN nvcc --version \
+    nvcc --version && \
+    printf "%s\n" \
+    "#include <cuda.h>" \
+    "#include <cuda_runtime.h>" \
+    "#include <cublas_v2.h>" \
+    "#include <cusolverDn.h>" \
+    "#include <cusparse.h>" \
+    "#include <curand.h>" \
+    "#include <nvrtc.h>" \
+    "int main() { return 0; }" \
+    > /tmp/test_compilation.cu \
+    && nvcc -x cu /tmp/test_compilation.cu -c -o /tmp/test_compilation.o \
+    -lcublas -lcusolver -lcusparse -lcurand -lnvrtc \
+    && rm /tmp/test_compilation.cu /tmp/test_compilation.o
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+LABEL ai.platform.cuda.enabled="true" \
+    ai.platform.cuda.version="${CUDA_VERSION}" \
+    ai.platform.cuda.mode="compile-only" \
+    ai.platform.cuda.components="nvcc,headers,nvrtc,nvml"
+
+# =============================================================================================================
+FROM base-python-codeserver-jupyter-${BUILD_TYPE} AS final
 
 ARG GIT_REPO
 ARG GIT_COMMIT
