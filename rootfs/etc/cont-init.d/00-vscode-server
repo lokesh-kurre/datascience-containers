@@ -46,7 +46,8 @@ echo "[cont-init] Writing default settings.json"
 
 cat > "${SETTINGS_FILE}" << 'EOF'
 {
-    "workbench.colorTheme": "Light Modern",
+    "workbench.editor.useModal": "off",
+    "workbench.colorTheme": "Dark Modern",
     "workbench.iconTheme": "vscode-icons",
 
     "window.menuBarVisibility": "classic",
@@ -54,10 +55,19 @@ cat > "${SETTINGS_FILE}" << 'EOF'
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.formatOnType": true,
-    "editor.wordWrap": "on",
+    "editor.wordWrap": "wordWrapColumn",
 
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 2000,
+    "files.exclude": {
+        "**/.venv": true
+    },
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "files.watcherExclude": {
+        "**/.venv/**": true
+    },
 
     "terminal.integrated.defaultProfile.linux": "bash",
 
