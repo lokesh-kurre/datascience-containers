@@ -3,14 +3,32 @@
 
 set -euo pipefail
 
-echo "[cont-init] Starting environment setup..."
+echo "[cont-init] setting up user..."
 
-SERVE_DIR="${SERVE_DIR:-}"
+: "${PRIMARY_UID:=}"
+: "${PRIMARY_GID:=}"
+
+CURRENT_UID=$(id -u jovyan)
+
+if [ -n "${PRIMARY_UID}" ] && [ "${PRIMARY_UID}" != "${CURRENT_UID}" ]; then
+    echo "[cont-init] Updating user jovyan UID ${CURRENT_UID} -> ${PRIMARY_UID}"
+
+    sed -i \
+      "s/^jovyan:x:${CURRENT_UID}:/jovyan:x:${PRIMARY_UID}:/" \
+      /etc/passwd
+fi
+
+# only fix directory itself, never recurse user data
+chown jovyan:shared /home/jovyan
+
+
+echo "[cont-init] starting environment setup..."
+
+SERVE_DIRECTORY="${SERVE_DIRECTORY:-}"
 FIX_PERMS_RECURSIVE="${FIX_PERMS_RECURSIVE:-0}"
 HOME_DIR="/home/jovyan"
-GOLDEN_VENV="/opt/venv"
 
-echo "[cont-init] SERVE_DIR=${SERVE_DIR:-default}"
+echo "[cont-init] SERVE_DIRECTORY=${SERVE_DIRECTORY:-default}"
 echo "[cont-init] FIX_PERMS_RECURSIVE=${FIX_PERMS_RECURSIVE}"
 
 # ==================================================
@@ -19,39 +37,23 @@ echo "[cont-init] FIX_PERMS_RECURSIVE=${FIX_PERMS_RECURSIVE}"
 
 echo "[cont-init] Configuring home..."
 
-if [[ -n "${SERVE_DIR}" ]]; then
-    mkdir -p "${SERVE_DIR}"
+if [[ -n "${SERVE_DIRECTORY}" ]]; then
+    mkdir -p "${SERVE_DIRECTORY}"
 
     if mountpoint -q "${HOME_DIR}"; then
         echo "[cont-init] ${HOME_DIR} is mounted, keeping it"
     else
-        echo "[cont-init] Mapping ${HOME_DIR} -> ${SERVE_DIR}"
+        echo "[cont-init] Mapping ${HOME_DIR} -> ${SERVE_DIRECTORY}"
         rm -rf "${HOME_DIR}"
-        ln -sfn "${SERVE_DIR}" "${HOME_DIR}"
+        ln -sfn "${SERVE_DIRECTORY}" "${HOME_DIR}"
     fi
 
     if [[ "${FIX_PERMS_RECURSIVE}" == "1" ]]; then
-        chown -R jovyan:shared "${SERVE_DIR}"
+        chown -R jovyan:shared "${SERVE_DIRECTORY}"
     else
-        chown jovyan:shared "${SERVE_DIR}" || true
+        chown jovyan:shared "${SERVE_DIRECTORY}" || true
     fi
 fi
-
-# ==================================================
-# VSCode server mapping
-# ==================================================
-
-echo "[cont-init] Configuring vscode server..."
-
-VSCODE_DIR="/opt/vscode-server"
-
-mkdir -p "${VSCODE_DIR}"
-
-rm -rf "${HOME_DIR}/.vscode-server"
-ln -sfn "${VSCODE_DIR}" "${HOME_DIR}/.vscode-server"
-
-rm -rf /root/.vscode-server
-ln -sfn "${VSCODE_DIR}" /root/.vscode-server
 
 # ==================================================
 # Home directories
@@ -73,7 +75,7 @@ done
 
 echo "[cont-init] Installing bash configuration..."
 
-cat >/etc/bash.bashrc <<'EOF'
+cat > /etc/bash.bashrc <<'EOF'
 # Global container bash config
 
 HISTCONTROL=ignoreboth:erasedups
@@ -84,11 +86,6 @@ shopt -s histappend
 shopt -s checkwinsize
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1
-
-if [ -z "${VIRTUAL_ENV:-}" ] &&
-   [ -f /opt/venv/bin/activate ]; then
-    source /opt/venv/bin/activate
-fi
 
 if [ -z "${_ENV_INFO_SHOWN:-}" ]; then
 export _ENV_INFO_SHOWN=1
@@ -227,7 +224,7 @@ echo "[cont-init] Configuring uv wrapper..."
 if [[ -x /usr/local/bin/uv && ! -x /usr/local/bin/uv.real ]]; then
     mv /usr/local/bin/uv /usr/local/bin/uv.real
 
-cat >/usr/local/bin/uv <<'EOF'
+cat > /usr/local/bin/uv <<'EOF'
 #!/usr/bin/env bash
 
 GOLDEN_VENV="/opt/venv"
@@ -235,8 +232,8 @@ CMD="$(basename "$0")"
 
 if [[ "$CMD" == "uvx" ]]; then
     unset UV_CONSTRAINT
-elif [[ "${VIRTUAL_ENV:-}" == "$GOLDEN_VENV" ]]; then
-    export UV_CONSTRAINT="$GOLDEN_VENV/pinned"
+elif [[ "${VIRTUAL_ENV:-}" == "${GOLDEN_VENV}" ]]; then
+    export UV_CONSTRAINT="${GOLDEN_VENV}/pinned"
 else
     unset UV_CONSTRAINT
 fi
@@ -251,30 +248,26 @@ fi
 # ==================================================
 # pip wrapper
 # ==================================================
-
 echo "[cont-init] Configuring pip wrapper..."
 
-if [[ -x "${GOLDEN_VENV}/bin/pip" &&
-      ! -x "${GOLDEN_VENV}/bin/pip.real" ]]; then
+if [[ -x "/opt/venv/bin/pip" && ! -x "/opt/venv/bin/pip.real" ]]; then
+    mv "/opt/venv/bin/pip" "/opt/venv/bin/pip.real"
 
-    mv "${GOLDEN_VENV}/bin/pip" \
-       "${GOLDEN_VENV}/bin/pip.real"
-
-cat >"${GOLDEN_VENV}/bin/pip" <<'EOF'
+cat >"/opt/venv/bin/pip" <<'EOF'
 #!/usr/bin/env bash
 
 GOLDEN_VENV="/opt/venv"
 
-if [[ "${VIRTUAL_ENV:-}" == "$GOLDEN_VENV" ]]; then
-    export PIP_CONSTRAINT="$GOLDEN_VENV/pinned"
+if [[ "${VIRTUAL_ENV:-}" == "${GOLDEN_VENV}" ]]; then
+    export PIP_CONSTRAINT="${GOLDEN_VENV}/pinned"
 else
     unset PIP_CONSTRAINT
 fi
 
-exec "$GOLDEN_VENV/bin/pip.real" "$@"
+exec "${GOLDEN_VENV}/bin/pip.real" "$@"
 EOF
 
-    chmod +x "${GOLDEN_VENV}/bin/pip"
+    chmod +x "/opt/venv/bin/pip"
 fi
 
 echo "[cont-init] Environment setup complete."

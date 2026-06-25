@@ -1,0 +1,7 @@
+[template]
+src = "proxy_locations.conf.tmpl"
+dest = "/etc/nginx/proxy_locations.conf"
+
+owner = "root"
+group = "root"
+mode = "0644"

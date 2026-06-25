@@ -2,11 +2,10 @@
 with-contenv
 
 # Import paths and base variables
-importas -S -D /home/jovyan SERVE_DIR
+importas -S -D /home/jovyan SERVE_DIRECTORY
 importas -S -D /            NB_PREFIX
-importas -S -D shared       PRIMARY_GID
 
-execline-cd ${SERVE_DIR}
+execline-cd ${SERVE_DIRECTORY}
 foreground { s6-rmrf /var/run/shared/notebook.sock }
 
 # Step 1: Capture PID 1 / Docker Host-provided supplementary groups (e.g., via --group-add)
@@ -17,17 +16,7 @@ backtick -n -E DB_GIDS { id -G jovyan }
 
 # Step 3: Dynamically look up the UID of jovyan and the GID of the requested PRIMARY_GID
 backtick -n -E TARGET_UID { id -u jovyan }
-backtick -n -E TARGET_GID {
-    ifelse { pipeline { echo ${PRIMARY_GID} } grep -qE "^[0-9]+$" }
-    {
-        echo ${PRIMARY_GID}
-    }
-    ifelse { pipeline { getent group ${PRIMARY_GID} } pipeline { cut -d: -f3 } grep -qE "." }
-    {
-        pipeline { getent group ${PRIMARY_GID} } cut -d: -f3
-    }
-    pipeline { getent group shared } cut -d: -f3
-}
+backtick -n -E TARGET_GID { id -g jovyan }
 
 # Step 4: Apply the identity configuration explicitly
 # -u and -g set the execution context. -G applies the combined list of supplementary groups.
@@ -38,8 +27,7 @@ export HOME /home/jovyan
 export VIRTUAL_ENV /opt/venv
 
 # Format and clean up the URL base path prefix
-backtick -n CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
-importas -S -D "" CLEANED_NB_PREFIX
+backtick -n -E -D "" CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
 
 foreground { s6-echo "INFO: starting notebook-server..." }
 fdmove -c 2 1

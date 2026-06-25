@@ -1,0 +1,60 @@
+#!/command/with-contenv bash
+
+set -euo pipefail
+
+echo "[cont-init] Configuring nginx..."
+
+# -----------------------------
+# Defaults
+# -----------------------------
+
+: "${SERVICE_PORT:=8888}"
+: "${NB_PREFIX:=/}"
+: "${BASE_URL:=${NB_PREFIX}}"
+: "${SERVE_DIRECTORY:=/home/jovyan}"
+: "${ENABLE_CONNECT_PROXY:=1}"
+
+
+# -------------------------------------
+# Normalize SERVE_DIRECTORY & BASE_URL
+# -------------------------------------
+
+# collapse duplicate slashes & remove trailing slash except root
+SERVE_DIRECTORY="$(echo "${SERVE_DIRECTORY}" | sed 's#//*#/#g; s#/$##')"
+BASE_URL="$(echo "${BASE_URL}" | sed 's#//*#/#g; s#/$##')"
+
+[ -z "${SERVE_DIRECTORY}" ] && SERVE_DIRECTORY="/home/jovyan"
+
+
+echo "[cont-init] Creating serve directory: ${SERVE_DIRECTORY}"
+
+install -d \
+    -o jovyan \
+    -g shared \
+    -m 775 \
+    "${SERVE_DIRECTORY}"
+
+
+echo "[cont-init] SERVICE_PORT=${SERVICE_PORT}"
+echo "[cont-init] BASE_URL=${BASE_URL}"
+echo "[cont-init] SERVE_DIRECTORY=${SERVE_DIRECTORY}"
+
+
+# -----------------------------
+# Export for confd
+# -----------------------------
+
+export SERVICE_PORT BASE_URL \
+    SERVE_DIRECTORY \
+    ENABLE_CONNECT_PROXY
+
+
+# -----------------------------
+# Render
+# -----------------------------
+
+confd -backend env -onetime
+
+nginx -VT
+
+echo "[cont-init] Configuring nginx... Done"

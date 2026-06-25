@@ -1,0 +1,95 @@
+client_max_body_size 0;
+
+absolute_redirect off;
+port_in_redirect off;
+server_name_in_redirect off;
+
+# ----------------------------
+# Common proxy settings
+# ----------------------------
+proxy_http_version 1.1;
+
+proxy_set_header Host $http_host;
+
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Scheme $scheme;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection $connection_upgrade;
+
+proxy_buffering off;
+
+proxy_read_timeout 86400;
+proxy_send_timeout 86400;
+
+# ----------------------------
+# Health
+# ----------------------------
+location = /health {
+    access_log off;
+    add_header Content-Type text/plain;
+    return 200 "ok\n";
+}
+
+# ----------------------------
+# Files
+# ----------------------------
+location = {{ getenv "BASE_URL" "" }}/files {
+    return 302 {{ getenv "BASE_URL" "" }}/files/;
+}
+
+location {{ getenv "BASE_URL" "" }}/files/ {
+    alias {{ getenv "SERVE_DIRECTORY" "/home/jovyan" }}/;
+    autoindex on;
+    autoindex_exact_size off;
+    autoindex_localtime on;
+}
+
+# ----------------------------
+# ttyd
+# ----------------------------
+location {{ getenv "BASE_URL" "" }}/ttyd {
+    proxy_pass http://unix:/var/run/shared/ttyd.sock;
+}
+
+# ----------------------------
+# Notebook
+# ----------------------------
+location = {{ getenv "BASE_URL" "" }}/notebook {
+    return 302 {{ getenv "BASE_URL" "" }}/notebook/;
+}
+
+location {{ getenv "BASE_URL" "" }}/notebook/ {
+    proxy_pass http://unix:/var/run/shared/notebook.sock;
+}
+
+{{ if eq (getenv "ENABLE_CONNECT_PROXY" "1") "1" }}
+# ----------------------------
+# Connect proxy
+# /connect/host:port/path
+# ----------------------------
+location ~ ^{{ getenv "BASE_URL" "" }}/connect/([^/]+)/(.*)$ {
+    proxy_set_header Host $1;
+    proxy_pass http://$1/$2$is_args$args;
+}
+{{ end }}
+
+# ----------------------------
+# VS Code fallback
+# MUST remain last
+# ----------------------------
+location {{ getenv "BASE_URL" "" }}/ {
+    proxy_pass http://unix:/var/run/shared/vscode.sock;
+}
+
+{{ if ne (getenv "BASE_URL" "") "" }}
+# ----------------------------
+# Base URL redirect
+# only when mounted under subpath
+# ----------------------------
+location / {
+    return 302 {{ getenv "BASE_URL" "" }}/;
+}
+{{ end }}

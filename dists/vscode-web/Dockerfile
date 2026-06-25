@@ -224,7 +224,7 @@ RUN find /etc/cont-init.d/ /etc/services.d/ -type f -exec chmod +x {} +
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl -fsSL "http://127.0.0.1:${SVC_PORT:-8888}/health" || exit 1
+    CMD curl -fsSL "http://127.0.0.1:${SERVICE_PORT:-8888}/health" || exit 1
 
 
 # =============================================================================================================

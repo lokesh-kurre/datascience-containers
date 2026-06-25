@@ -73,7 +73,7 @@ code serve-web \
     --server-base-path "${CLEANED_NB_PREFIX}" \
     --disable-telemetry \
     --commit-id ${VSCODE_GIT_HASH} \
-    --default-folder ${SERVE_DIR} \
+    --default-folder ${SERVE_DIRECTORY} \
     --socket-path /var/run/shared/vscode.sock
 ```
 

@@ -402,10 +402,11 @@ Integrated notebook environment.
 
 | Variable | Purpose |
 |-|-|
-| SVC_PORT | service port |
+| SERVICE_PORT | service port |
 | NB_PREFIX | URL prefix |
 | ENABLE_CONNECT_PROXY | proxy support |
-| PRIMARY_GID | override service primary group |
+| PRIMARY_UID | override service primary userid |
+| PRIMARY_GID | override service primary groupid |
 
 ---
 
