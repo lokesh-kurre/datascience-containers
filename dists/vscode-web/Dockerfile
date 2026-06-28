@@ -192,7 +192,8 @@ RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code --install-extens
     && cp -r /opt/vscode-web-server/extensions/ /opt/vscode-server/extensions/ \
     && tar -czf /opt/vscode-data/vscode-server-with-extensions.tar.gz -C /opt/vscode-server/ /opt/vscode-server/
 
-RUN DEPS="setuptools[core]<81.0.0 build wheel pip" \
+RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000  \
+    DEPS="setuptools[core]<81.0.0 build wheel pip" \
     && VIRTUAL_ENV=/opt/venv uv pip install ${DEPS} \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
@@ -215,7 +216,7 @@ USER root
 
 COPY rootfs/ /
 
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
+RUN --mount=type=cache,target=/root/.cache/uv echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
     && UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
     -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt
 
