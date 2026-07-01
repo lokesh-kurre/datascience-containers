@@ -4,6 +4,7 @@ with-contenv
 # Import paths and base variables
 importas -S -D /home/jovyan SERVE_DIRECTORY
 importas -S -D /            NB_PREFIX
+importas -S -D ""           PROXY_PREFIX
 
 execline-cd ${SERVE_DIRECTORY}
 foreground { s6-rmrf /var/run/shared/vscode.sock }
@@ -26,11 +27,11 @@ s6-applyuidgid -u ${TARGET_UID} -g ${TARGET_GID} -G "${HOST_GIDS} ${DB_GIDS}"
 export HOME ${SERVE_DIRECTORY}
 
 # Format and clean up the URL base path prefix
-backtick -n -E CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
+backtick -n -E CLEANED_PROXY_PREFIX { pipeline { /usr/bin/bash -c "echo ${PROXY_PREFIX:=${NB_PREFIX}}" } sed -E "s|/+|/|g; s|/$||" }
 backtick -n -E -D "" VSCODE_GIT_HASH { cat /opt/vscode-data/VSCODE_GIT_HASH }
 
 foreground { s6-echo "INFO: starting vscode-server..." }
 fdmove -c 2 1   
 
 # Execute vscode server
-code serve-web --host=0.0.0.0 --port=8887 --without-connection-token --cli-data-dir=/opt/vscode-web-server/cli --server-data-dir=/opt/vscode-web-server/ --server-base-path=${CLEANED_NB_PREFIX} --disable-telemetry --commit-id=${VSCODE_GIT_HASH} --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
+code serve-web --host=0.0.0.0 --port=8887 --without-connection-token --cli-data-dir=/opt/vscode-web-server/cli --server-data-dir=/opt/vscode-web-server/ --server-base-path=${CLEANED_PROXY_PREFIX} --disable-telemetry --commit-id=${VSCODE_GIT_HASH} --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock

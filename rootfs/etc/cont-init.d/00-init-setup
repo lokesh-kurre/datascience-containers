@@ -47,16 +47,18 @@ fi
 
 # PRIMARY_GID policy:
 # - empty: keep jovyan default gid
-# - provided and gid absent: remap shared gid to target
-# - provided and gid exists: use it as jovyan primary gid
+# - provided and gid absent: create a new group named "jovyan" with target gid
+# - provided and gid exists with different name: rename that group to "jovyan"
+# shared group is never remapped; the target gid becomes jovyan's primary gid.
 if [ -n "${PRIMARY_GID}" ]; then
     EXISTING_GROUP="$(getent group "${TARGET_GID}" | cut -d: -f1 || true)"
 
     if [ -z "${EXISTING_GROUP}" ]; then
-        echo "[cont-init] Mapping shared GID ${DEFAULT_GID} -> ${TARGET_GID}"
-        groupmod -g "${TARGET_GID}" shared
-    else
-        echo "[cont-init] Using existing GID ${TARGET_GID} (${EXISTING_GROUP}) as jovyan primary group"
+        echo "[cont-init] Creating group jovyan with GID ${TARGET_GID}"
+        groupadd -g "${TARGET_GID}" jovyan
+    elif [ "${EXISTING_GROUP}" != "jovyan" ]; then
+        echo "[cont-init] Renaming group ${EXISTING_GROUP} (GID ${TARGET_GID}) -> jovyan"
+        groupmod -n jovyan "${EXISTING_GROUP}"
     fi
 
     usermod -g "${TARGET_GID}" jovyan
@@ -250,7 +252,12 @@ attach_base_fallback_path() {
     local target_sp base_sp
     target_sp="$("$env_path/bin/python" -c "import site; print(site.getsitepackages()[0])")"
     base_sp="$(/opt/venv/bin/python -c "import site; print(site.getsitepackages()[0])")"
-    printf "%s\n" "$base_sp" > "$target_sp/zz-base-fallback.pth"
+    # Skip if the new env shares the same site-packages as the base (e.g. env_path IS /opt/venv)
+    [ "$target_sp" = "$base_sp" ] && return 0
+    # Use an executable .pth line so the base path is explicitly appended at the very end of
+    # sys.path; own-venv packages therefore always shadow any package that also exists in base.
+    printf "import sys; _p='%s'; _p not in sys.path and sys.path.append(_p)\n" \
+        "$base_sp" > "$target_sp/zz-base-fallback.pth"
 }
 
 uv() {
@@ -278,7 +285,6 @@ pyvenv() {
     attach_base_fallback_path "$env_path"
 }
 
-[ -z "${VIRTUAL_ENV:-}" ] && [ -f /opt/venv/bin/activate ] && source /opt/venv/bin/activate
 EOF
 
 chmod 644 /etc/bash.bashrc.d/40-python-fallback.sh

@@ -1,9 +1,8 @@
-ARG BUILD_TYPE
+ARG BUILD_TYPE=cpu
 
-ARG UBUNTU_VERSION
+ARG UBUNTU_VERSION=22.04
 ARG PYTHON_VERSION
 ARG VSCODE_VERSION
-ARG S6_OVERLAY_VERSION
 
 ARG GIT_REPO
 ARG GIT_COMMIT
@@ -25,8 +24,7 @@ LABEL ai.platform.type="notebook"
 LABEL ai.platform.type="vscode"
 LABEL ai.platform.cuda.enabled="false"
 
-ARG DEBIAN_FRONTEND
-ARG S6_OVERLAY_VERSION
+ARG DEBIAN_FRONTEND=noninteractive
 
 ENV TERM=xterm-256color
 ENV SHELL=/bin/bash
@@ -62,10 +60,10 @@ RUN curl -L https://dl.k8s.io/release/v1.36.1/bin/linux/amd64/kubectl \
     && update-alternatives --install /usr/local/bin/k k /usr/local/bin/kubectl 1 \
     && wget https://github.com/kelseyhightower/confd/releases/download/v0.16.0/confd-0.16.0-linux-amd64 -O /usr/local/bin/confd && chmod +x /usr/local/bin/confd
 
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-RUN sudo tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
-RUN sudo tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/latest/download/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/latest/download/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 
@@ -150,8 +148,9 @@ RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000 \
 
 CMD [ "/bin/bash", "--login" ]
 
+
 # =============================================================================================================
-FROM base-python AS base-python-codeserver-jupyter
+FROM base-python AS vscodeserver-assets
 
 ARG VSCODE_VERSION
 
@@ -179,13 +178,23 @@ RUN install -d /opt/vscode-server/bin \
     && mv /opt/vscode-server/bin/vscode-server-linux-x64 /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
     && chmod -R a+rwX /opt/vscode-server/ \
     && tar -czf /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-server/ /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
-    && code version use --install-dir /opt/vscode-server/bin/${VSCODE_GIT_HASH}/bin/code-server stable \
-    && sudo ln -sf /opt/vscode-server/ /root/.vscode-server
+    && code version use --install-dir /opt/vscode-server/bin/${VSCODE_GIT_HASH}/bin/code-server stable
 
 COPY dists/vscode-web/vscode-extensions.txt /opt/vscode-data/extensions.list
 RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code --install-extension {} --extensions-dir /opt/vscode-web-server/extensions/ || true' \
     && cp -r /opt/vscode-web-server/extensions/ /opt/vscode-server/extensions/ \
     && tar -czf /opt/vscode-data/vscode-server-with-extensions.tar.gz -C /opt/vscode-server/ /opt/vscode-server/
+
+
+# =============================================================================================================
+FROM base-python AS base-python-codeserver-jupyter
+
+COPY --from=vscodeserver-assets /usr/bin/code /usr/bin/code
+COPY --from=vscodeserver-assets /opt/vscode-data/ /opt/vscode-data/
+COPY --from=vscodeserver-assets /opt/vscode-web-server/ /opt/vscode-web-server/
+COPY --from=vscodeserver-assets /opt/vscode-server/ /opt/vscode-server/
+
+RUN sudo ln -sf /opt/vscode-server/ /root/.vscode-server
 
 RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="setuptools[core]<81.0.0 build wheel pip" \
@@ -215,14 +224,16 @@ RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-c
     && UV_CACHE_DIR=/tmp/uv-cache-root UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
     -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt
 
-RUN rm -rf /root/.cache
+RUN rm -rf /root/.cache /home/jovyan/*
 
 RUN find /etc/cont-init.d/ /etc/services.d/ -type f -exec chmod +x {} +
+
+ENV S6_KEEP_ENV=1
 
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl -fsSL "http://127.0.0.1:${SERVICE_PORT:-8888}/health" || exit 1
+    CMD curl -fsSL "http://127.0.0.1:8080/health" || exit 1
 
 
 # =============================================================================================================
