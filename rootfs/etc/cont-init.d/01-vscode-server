@@ -55,7 +55,7 @@ cat > "${SETTINGS_FILE}" << 'EOF'
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.formatOnType": true,
-    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrap": "on",
 
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 2000,
