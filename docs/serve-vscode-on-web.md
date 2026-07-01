@@ -6,13 +6,14 @@ This document describes how this repository prepares and runs VS Code in browser
 
 - Channel: `stable`
 - Platform: `linux-x64`
-- VS Code version: `1.124.2`
-- Commit: `6928394f91b684055b873eecb8bc281365131f1c`
+- VS Code version: configured via `VSCODE_VERSION`
+- Commit: derived automatically from installed `code` CLI
 
-These values are wired in `dists/vscode-web/Dockerfile` through:
+The image is wired through:
 
-- `ARG VSCODE_VERSION=1.124.2`
-- `ARG VSCODE_GIT_HASH=6928394f91b684055b873eecb8bc281365131f1c`
+- `ARG VSCODE_VERSION`
+
+No `VSCODE_GIT_HASH` build arg is required.
 
 ## Release metadata endpoints
 
@@ -30,7 +31,14 @@ The image downloads and prepares three components:
 
 ```bash
 wget -qO cli.tar.gz \
-    https://update.code.visualstudio.com/commit:<commit>/cli-linux-x64/stable
+    https://update.code.visualstudio.com/<version>/cli-linux-x64/stable
+```
+
+Then commit is parsed from CLI output, for example:
+
+```bash
+code --version
+# code 1.125.1 (commit fcf604774b9f2674b473065736ee75077e256353)
 ```
 
 2. Web server backend for `serve-web`:
@@ -77,6 +85,8 @@ code serve-web \
     --socket-path /var/run/shared/vscode.sock
 ```
 
+`VSCODE_GIT_HASH` is read at runtime from `/opt/vscode-data/VSCODE_GIT_HASH`.
+
 Notes:
 
 - `CLEANED_NB_PREFIX` is normalized from `NB_PREFIX` (`/` collapse + trailing slash removed).
@@ -112,8 +122,8 @@ and copied into:
 
 ## Upgrade workflow
 
-1. Pick new `version` and matching `commit`.
-2. Update `VSCODE_VERSION` and `VSCODE_GIT_HASH` in `dists/vscode-web/Dockerfile`.
+1. Pick new `version`.
+2. Update `VSCODE_VERSION` in `build_arg.properties` (or pass `--build-arg VSCODE_VERSION=...`).
 3. Rebuild image and validate `code --version` and browser access.
 4. Verify extension install succeeds.
 5. Publish image with a new immutable tag.

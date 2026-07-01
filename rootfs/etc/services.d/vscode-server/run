@@ -2,7 +2,6 @@
 with-contenv
 
 # Import paths and base variables
-importas -S -D ""           VSCODE_GIT_HASH
 importas -S -D /home/jovyan SERVE_DIRECTORY
 importas -S -D /            NB_PREFIX
 
@@ -28,6 +27,7 @@ export HOME ${SERVE_DIRECTORY}
 
 # Format and clean up the URL base path prefix
 backtick -n -E CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }
+backtick -n -E -D "" VSCODE_GIT_HASH { cat /opt/vscode-data/VSCODE_GIT_HASH }
 
 foreground { s6-echo "INFO: starting vscode-server..." }
 fdmove -c 2 1   

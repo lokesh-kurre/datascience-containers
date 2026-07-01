@@ -3,7 +3,6 @@ ARG BUILD_TYPE
 ARG UBUNTU_VERSION
 ARG PYTHON_VERSION
 ARG VSCODE_VERSION
-ARG VSCODE_GIT_HASH
 ARG S6_OVERLAY_VERSION
 
 ARG GIT_REPO
@@ -155,23 +154,26 @@ CMD [ "/bin/bash", "--login" ]
 FROM base-python AS base-python-codeserver-jupyter
 
 ARG VSCODE_VERSION
-ARG VSCODE_GIT_HASH
 
 ENV VSCODE_VERSION=${VSCODE_VERSION}
-ENV VSCODE_GIT_HASH=${VSCODE_GIT_HASH}
 
 RUN install -d /opt/vscode-data/ /opt/vscode-server/ \
-    && wget -qO /opt/vscode-data/cli_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/commit:${VSCODE_GIT_HASH}/cli-linux-x64/stable \
+    && wget -qO /opt/vscode-data/cli_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/cli-linux-x64/stable \
     && tar -xzf /opt/vscode-data/cli_${VSCODE_VERSION}.tar.gz -C /tmp \
     && sudo install -m 0755 -o root -g root /tmp/code /usr/bin/code \
+    && VSCODE_GIT_HASH="$(code --version | sed -nE 's/.*\(commit ([0-9a-f]{40})\).*/\1/p')" \
+    && test -n "${VSCODE_GIT_HASH}" \
+    && printf '%s\n' "${VSCODE_GIT_HASH}" > /opt/vscode-data/VSCODE_GIT_HASH \
     && rm /tmp/code
 
 RUN install -d /opt/vscode-data/ /opt/vscode-web-server/cli/serve-web \
+    && VSCODE_GIT_HASH="$(cat /opt/vscode-data/VSCODE_GIT_HASH)" \
     && wget -qO /opt/vscode-data/web_server_${VSCODE_GIT_HASH}.tar.gz https://update.code.visualstudio.com/commit:${VSCODE_GIT_HASH}/server-linux-x64-web/stable \
     && tar -xzf /opt/vscode-data/web_server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-web-server/cli/serve-web/ \
     && mv /opt/vscode-web-server/cli/serve-web/vscode-server-linux-x64-web /opt/vscode-web-server/cli/serve-web/${VSCODE_GIT_HASH}
 
 RUN install -d /opt/vscode-server/bin \
+    && VSCODE_GIT_HASH="$(cat /opt/vscode-data/VSCODE_GIT_HASH)" \
     && wget -qO /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz https://update.code.visualstudio.com/commit:${VSCODE_GIT_HASH}/server-linux-x64/stable \
     && tar -xzf /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-server/bin/ \
     && mv /opt/vscode-server/bin/vscode-server-linux-x64 /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
