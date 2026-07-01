@@ -23,7 +23,7 @@ backtick -n -E TARGET_GID { id -g jovyan }
 s6-applyuidgid -u ${TARGET_UID} -g ${TARGET_GID} -G "${HOST_GIDS} ${DB_GIDS}"
 
 # Set user context environments
-export HOME /home/jovyan
+export HOME ${SERVE_DIRECTORY}
 
 # Format and clean up the URL base path prefix
 backtick -n -E -D "" CLEANED_NB_PREFIX { pipeline { echo ${NB_PREFIX} } sed -E "s|/+|/|g; s|/$||" }

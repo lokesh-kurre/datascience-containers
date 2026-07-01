@@ -8,66 +8,99 @@ echo "[cont-init] setting up user..."
 : "${PRIMARY_UID:=}"
 : "${PRIMARY_GID:=}"
 
-CURRENT_UID=$(id -u jovyan)
+DEFAULT_UID="$(id -u jovyan)"
+DEFAULT_GID="$(id -g jovyan)"
+TARGET_UID="${PRIMARY_UID:-${DEFAULT_UID}}"
+TARGET_GID="${PRIMARY_GID:-${DEFAULT_GID}}"
+JOVYAN_GROUPS_BEFORE="$(id -nG jovyan | tr ' ' ',')"
+EXISTING_USER_GROUPS=""
 
-if [ -n "${PRIMARY_UID}" ] && [ "${PRIMARY_UID}" != "${CURRENT_UID}" ]; then
-    echo "[cont-init] Updating user jovyan UID ${CURRENT_UID} -> ${PRIMARY_UID}"
+echo "[cont-init] DEFAULT_UID=${DEFAULT_UID}, DEFAULT_GID=${DEFAULT_GID}"
+echo "[cont-init] TARGET_UID=${TARGET_UID}, TARGET_GID=${TARGET_GID}"
 
-    sed -i \
-      "s/^jovyan:x:${CURRENT_UID}:/jovyan:x:${PRIMARY_UID}:/" \
-      /etc/passwd
+# PRIMARY_UID policy:
+# - empty: keep jovyan default uid
+# - provided and uid absent: remap jovyan to uid
+# - provided and uid exists: rename existing uid owner to jovyan
+if [ -n "${PRIMARY_UID}" ]; then
+    EXISTING_USER="$(getent passwd "${TARGET_UID}" | cut -d: -f1 || true)"
+    if [ -n "${EXISTING_USER}" ] && [ "${EXISTING_USER}" != "jovyan" ]; then
+        EXISTING_USER_GROUPS="$(id -nG "${EXISTING_USER}" | tr ' ' ',')"
+    fi
+
+    if [ -z "${EXISTING_USER}" ]; then
+        echo "[cont-init] Mapping jovyan UID ${DEFAULT_UID} -> ${TARGET_UID}"
+        usermod -u "${TARGET_UID}" jovyan
+    elif [ "${EXISTING_USER}" != "jovyan" ]; then
+        echo "[cont-init] UID ${TARGET_UID} belongs to ${EXISTING_USER}; renaming it to jovyan"
+
+        BACKUP_USER="jovyan_prev"
+        if getent passwd "${BACKUP_USER}" >/dev/null 2>&1; then
+            BACKUP_USER="jovyan_prev_${DEFAULT_UID}"
+        fi
+
+        usermod -l "${BACKUP_USER}" jovyan
+        usermod -l jovyan "${EXISTING_USER}"
+        usermod -d /home/jovyan -s /bin/bash jovyan
+    fi
 fi
 
-# only fix directory itself, never recurse user data
-chown jovyan:shared /home/jovyan
+# PRIMARY_GID policy:
+# - empty: keep jovyan default gid
+# - provided and gid absent: remap shared gid to target
+# - provided and gid exists: use it as jovyan primary gid
+if [ -n "${PRIMARY_GID}" ]; then
+    EXISTING_GROUP="$(getent group "${TARGET_GID}" | cut -d: -f1 || true)"
+
+    if [ -z "${EXISTING_GROUP}" ]; then
+        echo "[cont-init] Mapping shared GID ${DEFAULT_GID} -> ${TARGET_GID}"
+        groupmod -g "${TARGET_GID}" shared
+    else
+        echo "[cont-init] Using existing GID ${TARGET_GID} (${EXISTING_GROUP}) as jovyan primary group"
+    fi
+
+    usermod -g "${TARGET_GID}" jovyan
+fi
+
+# Keep and merge supplementary groups on jovyan; runtime --group-add is merged in service scripts.
+MERGED_GROUPS="$(
+    printf '%s\n' "root,shared" "${JOVYAN_GROUPS_BEFORE}" "${EXISTING_USER_GROUPS}" \
+    | tr ',' '\n' \
+    | awk 'NF && !seen[$0]++' \
+    | paste -sd, -
+)"
+
+if [ -n "${MERGED_GROUPS}" ]; then
+    usermod -aG "${MERGED_GROUPS}" jovyan
+fi
 
 
 echo "[cont-init] starting environment setup..."
 
-SERVE_DIRECTORY="${SERVE_DIRECTORY:-}"
+SERVE_DIRECTORY="${SERVE_DIRECTORY:-/home/jovyan}"
 FIX_PERMS_RECURSIVE="${FIX_PERMS_RECURSIVE:-0}"
-HOME_DIR="/home/jovyan"
 
 echo "[cont-init] SERVE_DIRECTORY=${SERVE_DIRECTORY:-default}"
 echo "[cont-init] FIX_PERMS_RECURSIVE=${FIX_PERMS_RECURSIVE}"
 
 # ==================================================
-# Workspace / home mapping
+# Workspace setup
 # ==================================================
 
-echo "[cont-init] Configuring home..."
+echo "[cont-init] Configuring workspace..."
 
 if [[ -n "${SERVE_DIRECTORY}" ]]; then
-    mkdir -p "${SERVE_DIRECTORY}"
+    PRIMARY_GROUP_NAME="$(id -gn jovyan)"
+    install -d -o jovyan -g "${PRIMARY_GROUP_NAME}" -m 775 "${SERVE_DIRECTORY}"
 
-    if mountpoint -q "${HOME_DIR}"; then
-        echo "[cont-init] ${HOME_DIR} is mounted, keeping it"
-    else
-        echo "[cont-init] Mapping ${HOME_DIR} -> ${SERVE_DIRECTORY}"
-        rm -rf "${HOME_DIR}"
-        ln -sfn "${SERVE_DIRECTORY}" "${HOME_DIR}"
-    fi
+    echo "[cont-init] Workspace directory: ${SERVE_DIRECTORY}"
 
     if [[ "${FIX_PERMS_RECURSIVE}" == "1" ]]; then
-        chown -R jovyan:shared "${SERVE_DIRECTORY}"
+        chown -R jovyan:"${PRIMARY_GROUP_NAME}" "${SERVE_DIRECTORY}"
     else
-        chown jovyan:shared "${SERVE_DIRECTORY}" || true
+        chown jovyan:"${PRIMARY_GROUP_NAME}" "${SERVE_DIRECTORY}" || true
     fi
 fi
-
-# ==================================================
-# Home directories
-# ==================================================
-
-echo "[cont-init] Preparing user directories..."
-
-for d in \
-    "${HOME_DIR}/.local" \
-    "${HOME_DIR}/.config" \
-    "${HOME_DIR}/.cache"
-do
-    install -d -o jovyan -g shared -m 755 "$d" || true
-done
 
 # ==================================================
 # Global bash config
@@ -142,6 +175,15 @@ command -v kubectl >/dev/null 2>&1 &&
 command -v uv >/dev/null 2>&1 &&
     source <(uv generate-shell-completion bash 2>/dev/null)
 
+[ -f /etc/container-prompt.sh ] &&
+    source /etc/container-prompt.sh
+
+if [ -d /etc/bash.bashrc.d ]; then
+    for f in /etc/bash.bashrc.d/*.sh; do
+        [ -r "$f" ] && source "$f"
+    done
+fi
+
 EOF
 
 chmod 644 /etc/bash.bashrc
@@ -190,30 +232,56 @@ EOF
 chmod 644 /etc/container-prompt.sh
 
 # ==================================================
-# User bashrc
+# Global bashrc.d drop-ins
 # ==================================================
 
-echo "[cont-init] Patching user bashrc..."
+echo "[cont-init] Installing global bash drop-ins..."
 
-USER_BASHRC="${HOME_DIR}/.bashrc"
+install -d -o root -g root -m 755 /etc/bash.bashrc.d
 
-touch "${USER_BASHRC}"
+cat >/etc/bash.bashrc.d/40-python-fallback.sh <<'EOF'
+# Python environment fallback helpers.
 
-sed -i \
-'/# >>> CONTAINER_PROMPT >>>/,/# <<< CONTAINER_PROMPT <<</d' \
-"${USER_BASHRC}"
+attach_base_fallback_path() {
+    local env_path="$1"
+    [ -x "$env_path/bin/python" ] || return 0
+    [ -x "/opt/venv/bin/python" ] || return 0
 
-cat >>"${USER_BASHRC}" <<'EOF'
+    local target_sp base_sp
+    target_sp="$("$env_path/bin/python" -c "import site; print(site.getsitepackages()[0])")"
+    base_sp="$(/opt/venv/bin/python -c "import site; print(site.getsitepackages()[0])")"
+    printf "%s\n" "$base_sp" > "$target_sp/zz-base-fallback.pth"
+}
 
-# >>> CONTAINER_PROMPT >>>
-[ -f /etc/container-prompt.sh ] &&
-    source /etc/container-prompt.sh
-# <<< CONTAINER_PROMPT <<<
+uv() {
+    if [ "$1" = "venv" ]; then
+        shift
+        local env_path
+        command uv venv "$@"
+        env_path="${@: -1}"
+        [ -x "$env_path/bin/python" ] || env_path=".venv"
+        attach_base_fallback_path "$env_path"
+    else
+        command uv "$@"
+    fi
+}
 
+mkvenv() {
+    uv venv "$@"
+}
+
+pyvenv() {
+    local env_path
+    command python -m venv "$@"
+    env_path="${@: -1}"
+    [ -x "$env_path/bin/python" ] || env_path=".venv"
+    attach_base_fallback_path "$env_path"
+}
+
+[ -z "${VIRTUAL_ENV:-}" ] && [ -f /opt/venv/bin/activate ] && source /opt/venv/bin/activate
 EOF
 
-chown jovyan:shared "${USER_BASHRC}"
-chmod 644 "${USER_BASHRC}"
+chmod 644 /etc/bash.bashrc.d/40-python-fallback.sh
 
 # ==================================================
 # uv wrapper

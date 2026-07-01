@@ -1,18 +1,18 @@
-ARG BUILD_TYPE=cpu
+ARG BUILD_TYPE
 
-ARG UBUNTU_VERSION=22.04
-ARG PYTHON_VERSION=3.10.13
-ARG VSCODE_VERSION=1.124.2
-ARG VSCODE_GIT_HASH=6928394f91b684055b873eecb8bc281365131f1c
-ARG S6_OVERLAY_VERSION=3.2.3.0
+ARG UBUNTU_VERSION
+ARG PYTHON_VERSION
+ARG VSCODE_VERSION
+ARG VSCODE_GIT_HASH
+ARG S6_OVERLAY_VERSION
 
-ARG GIT_REPO=unknown
-ARG GIT_COMMIT=unknown
-ARG BUILD_DATE=unknown
-ARG VERSION=dev
+ARG GIT_REPO
+ARG GIT_COMMIT
+ARG BUILD_DATE
+ARG VERSION
 
-ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=2
+ARG CUDA_MAJOR
+ARG CUDA_MINOR
 
 # =============================================================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS base
@@ -26,7 +26,7 @@ LABEL ai.platform.type="notebook"
 LABEL ai.platform.type="vscode"
 LABEL ai.platform.cuda.enabled="false"
 
-ARG DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND
 ARG S6_OVERLAY_VERSION
 
 ENV TERM=xterm-256color
@@ -110,7 +110,7 @@ ARG PYTHON_VERSION
 LABEL org.opencontainers.image.python.version=${PYTHON_VERSION}
 
 RUN groupadd shared \
-    && useradd -m -u 1000 -g shared -G root --shell /bin/bash jovyan \
+    && useradd -m -d /home/jovyan -u 1000 -g shared -G root --shell /bin/bash jovyan \
     && usermod -aG shared jovyan \
     && echo "jovyan ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/jovyan \
     && chmod 0440 /etc/sudoers.d/jovyan
@@ -136,24 +136,18 @@ ENV VIRTUAL_ENV_DISABLE_PROMPT=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    TF_CPP_MIN_LOG_LEVEL=2 \
-    OMP_NUM_THREADS=1 \
-    MKL_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 \
-    NUMEXPR_NUM_THREADS=1
+    TF_CPP_MIN_LOG_LEVEL=2
 
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000 \
+RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000 \
     DEPS="opencv-python-headless==0 opencv-contrib-python==0 opencv-python==0" \
     && VIRTUAL_ENV=/opt/venv uv venv /opt/venv --python "${PYTHON_VERSION}" \
     && touch /opt/venv/pinned \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned \
     && chmod 0644 /opt/venv/pinned \
-    && UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install \
+    && UV_CACHE_DIR=/tmp/uv-cache-jovyan UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install \
     pip \
     isort \
-    ipykernel \
-    && echo 'command -v uv >/dev/null 2>&1 && eval "$(uv generate-shell-completion bash)"' >> ~/.bashrc \
-    && echo '[ -z "${VIRTUAL_ENV:-}" ] && [ -f /opt/venv/bin/activate ] && source /opt/venv/bin/activate' >> ~/.bashrc
+    ipykernel
 
 CMD [ "/bin/bash", "--login" ]
 
@@ -184,7 +178,6 @@ RUN install -d /opt/vscode-server/bin \
     && chmod -R a+rwX /opt/vscode-server/ \
     && tar -czf /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-server/ /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
     && code version use --install-dir /opt/vscode-server/bin/${VSCODE_GIT_HASH}/bin/code-server stable \
-    && ln -sf /opt/vscode-server/ /home/jovyan/.vscode-server \
     && sudo ln -sf /opt/vscode-server/ /root/.vscode-server
 
 COPY dists/vscode-web/vscode-extensions.txt /opt/vscode-data/extensions.list
@@ -192,15 +185,15 @@ RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code --install-extens
     && cp -r /opt/vscode-web-server/extensions/ /opt/vscode-server/extensions/ \
     && tar -czf /opt/vscode-data/vscode-server-with-extensions.tar.gz -C /opt/vscode-server/ /opt/vscode-server/
 
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000  \
+RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="setuptools[core]<81.0.0 build wheel pip" \
-    && VIRTUAL_ENV=/opt/venv uv pip install ${DEPS} \
+    && UV_CACHE_DIR=/tmp/uv-cache-jovyan VIRTUAL_ENV=/opt/venv uv pip install ${DEPS} \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 COPY dists/vscode-web/notebook-extensions.txt /opt/notebook-data/extensions.list
-RUN --mount=type=cache,target=/home/jovyan/.cache/uv,uid=1000,gid=1000  \
+RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="notebook==6.5.7" \
-    && UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv \
+    && UV_CACHE_DIR=/tmp/uv-cache-jovyan UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv \
     uv pip install --no-build-isolation \
     ${DEPS} ipywidgets widgetsnbextension jupyter_contrib_nbextensions  \
     git+https://github.com/Jupyter-contrib/jupyter_contrib_core/@master \
@@ -216,9 +209,11 @@ USER root
 
 COPY rootfs/ /
 
-RUN --mount=type=cache,target=/root/.cache/uv echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
-    && UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
+RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
+    && UV_CACHE_DIR=/tmp/uv-cache-root UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
     -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt
+
+RUN rm -rf /root/.cache
 
 RUN find /etc/cont-init.d/ /etc/services.d/ -type f -exec chmod +x {} +
 
@@ -231,8 +226,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
 # =============================================================================================================
 FROM base-python-codeserver-jupyter-cpu AS base-python-codeserver-jupyter-gpu
 
-ARG CUDA_MAJOR=12
-ARG CUDA_MINOR=2
+ARG CUDA_MAJOR
+ARG CUDA_MINOR
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}
 
 COPY --from=cuda-builder /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_VERSION}
@@ -247,8 +242,7 @@ ENV CUDAToolkit_ROOT=/usr/local/cuda
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${CUDA_HOME}/targets/x86_64-linux/lib/stubs
 ENV LIBRARY_PATH=${CUDA_HOME}/targets/x86_64-linux/lib/stubs:${LIBRARY_PATH}
 
-RUN nvcc --version \
-    nvcc --version && \
+RUN nvcc --version && \
     printf "%s\n" \
     "#include <cuda.h>" \
     "#include <cuda_runtime.h>" \
