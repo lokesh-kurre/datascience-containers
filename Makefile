@@ -60,15 +60,24 @@ build:
 		-f dists/vscode-web/Dockerfile \
 		.
 
+push: build
+	docker push $(IMAGE_NAME):$(IMAGE_TAG)
+
 
 build-cpu:
-	$(MAKE) build \
-		BUILD_TYPE=cpu
+	$(MAKE) build BUILD_TYPE=cpu
 
 
 build-gpu:
-	$(MAKE) build \
-		BUILD_TYPE=gpu
+	$(MAKE) build BUILD_TYPE=gpu
+
+
+push-cpu: 
+	$(MAKE) push BUILD_TYPE=cpu
+
+
+push-gpu:
+	$(MAKE) push BUILD_TYPE=gpu
 
 
 run:
