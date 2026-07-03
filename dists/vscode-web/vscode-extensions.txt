@@ -1,5 +1,6 @@
 anthropic.claude-code
 christian-kohler.path-intellisense
+cweijan.vscode-ssh
 davidanson.vscode-markdownlint
 donjayamanne.githistory
 dutchigor.json-viewer
