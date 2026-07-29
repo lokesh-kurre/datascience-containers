@@ -1,3 +1,4 @@
+AndrewButson.github-copilot-llm-gateway
 anthropic.claude-code
 christian-kohler.path-intellisense
 cweijan.vscode-ssh

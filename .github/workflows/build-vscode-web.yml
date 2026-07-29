@@ -1,0 +1,64 @@
+name: Build and Push Custom Datascience Containers
+
+on:
+  workflow_dispatch:
+    inputs:
+      ubuntu_tag:
+        description: Ubuntu Version
+        required: true
+        default: "22.04"
+
+      python_tag:
+        description: Python Version
+        required: true
+        default: "3.11"
+
+      vscode_tag:
+        description: VS Code Version
+        required: true
+        default: "1.127.0"
+
+      cuda_major_tag:
+        description: CUDA Major Version
+        required: true
+        default: "12"
+
+      cuda_minor_tag:
+        description: CUDA Minor Version
+        required: true
+        default: "2"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: docker-hub
+    strategy:
+      matrix:
+        build_type: [cpu, gpu]
+
+    env:
+      UBUNTU_VERSION: ${{ inputs.ubuntu_tag }}
+      PYTHON_VERSION: ${{ inputs.python_tag }}
+      VSCODE_VERSION: ${{ inputs.vscode_tag }}
+      CUDA_MAJOR: ${{ inputs.cuda_major_tag }}
+      CUDA_MINOR: ${{ inputs.cuda_minor_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          submodules: recursive
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
+          docker login -u "${{ vars.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Show build configuration
+        run: |
+          make -e info BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build and Push Image
+        run: |
+          make -e push-${{ matrix.build_type }} BUILD_TYPE=${{ matrix.build_type }}

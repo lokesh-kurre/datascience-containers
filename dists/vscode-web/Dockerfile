@@ -112,8 +112,6 @@ RUN groupadd shared \
     && echo "jovyan ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/jovyan \
     && chmod 0440 /etc/sudoers.d/jovyan
 
-ENV XDG_DATA_HOME=/opt/share
-
 # Fixing permissions for shared volumes and directories
 RUN install -g shared -m 2775 -d /var/run/shared /opt /opt/share \
     && setfacl -m d:g:shared:rwx /opt /var/run/shared
@@ -129,7 +127,9 @@ RUN for v in $(seq 8 14); do \
 USER jovyan
 
 ENV VIRTUAL_ENV_DISABLE_PROMPT=1 \
+    UV_PYTHON=${PYTHON_VERSION} \
     UV_LINK_MODE=copy \
+    UV_HTTP_CONNECT_TIMEOUT=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -233,7 +233,7 @@ ENV S6_KEEP_ENV=1
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl -fsSL "http://127.0.0.1:8080/health" || exit 1
+    CMD curl --insecure -fsSL "http://127.0.0.1:8080/health" || exit 1
 
 
 # =============================================================================================================

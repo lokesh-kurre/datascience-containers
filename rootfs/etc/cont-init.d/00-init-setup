@@ -241,54 +241,6 @@ echo "[cont-init] Installing global bash drop-ins..."
 
 install -d -o root -g root -m 755 /etc/bash.bashrc.d
 
-cat >/etc/bash.bashrc.d/40-python-fallback.sh <<'EOF'
-# Python environment fallback helpers.
-
-attach_base_fallback_path() {
-    local env_path="$1"
-    [ -x "$env_path/bin/python" ] || return 0
-    [ -x "/opt/venv/bin/python" ] || return 0
-
-    local target_sp base_sp
-    target_sp="$("$env_path/bin/python" -c "import site; print(site.getsitepackages()[0])")"
-    base_sp="$(/opt/venv/bin/python -c "import site; print(site.getsitepackages()[0])")"
-    # Skip if the new env shares the same site-packages as the base (e.g. env_path IS /opt/venv)
-    [ "$target_sp" = "$base_sp" ] && return 0
-    # Use an executable .pth line so the base path is explicitly appended at the very end of
-    # sys.path; own-venv packages therefore always shadow any package that also exists in base.
-    printf "import sys; _p='%s'; _p not in sys.path and sys.path.append(_p)\n" \
-        "$base_sp" > "$target_sp/zz-base-fallback.pth"
-}
-
-uv() {
-    if [ "$1" = "venv" ]; then
-        shift
-        local env_path
-        command uv venv "$@"
-        env_path="${@: -1}"
-        [ -x "$env_path/bin/python" ] || env_path=".venv"
-        attach_base_fallback_path "$env_path"
-    else
-        command uv "$@"
-    fi
-}
-
-mkvenv() {
-    uv venv "$@"
-}
-
-pyvenv() {
-    local env_path
-    command python -m venv "$@"
-    env_path="${@: -1}"
-    [ -x "$env_path/bin/python" ] || env_path=".venv"
-    attach_base_fallback_path "$env_path"
-}
-
-EOF
-
-chmod 644 /etc/bash.bashrc.d/40-python-fallback.sh
-
 # ==================================================
 # uv wrapper
 # ==================================================

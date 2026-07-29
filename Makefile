@@ -6,14 +6,12 @@ ARGS :=
 
 include build_arg.properties
 
-
 GIT_REPO := $(shell git config --get remote.origin.url)
 GIT_COMMIT := $(shell git rev-parse HEAD)
 GIT_BRANCH := $(shell git branch --show-current)
 GIT_DIRTY := $(shell test -n "$$(git status --porcelain)" && echo true || echo false)
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERSION := $(shell git describe --tags --always --dirty)
-
 
 IMAGE_NAME := lokeshkurre/vscode-web
 
@@ -25,24 +23,26 @@ endif
 
 IMAGE := $(IMAGE_NAME):$(IMAGE_TAG)
 
+BUILD_ARGS := \
+	--build-arg UBUNTU_VERSION=$(UBUNTU_VERSION) \
+	--build-arg PYTHON_VERSION=$(PYTHON_VERSION) \
+	--build-arg VSCODE_VERSION=$(VSCODE_VERSION) \
+	--build-arg CUDA_MAJOR=$(CUDA_MAJOR) \
+	--build-arg CUDA_MINOR=$(CUDA_MINOR)
 
-BUILD_ARGS := $(shell awk '\
-	!/^#/ && NF { \
-	print "--build-arg", $$0 \
-	}' build_arg.properties)
+.PHONY: info build push build-cpu build-gpu push-cpu push-gpu run
 
-
-.PHONY: version build build-cpu build-gpu run
-
-
-version:
-	@echo "Image:       $(IMAGE)"
-	@echo "Target:      $(TARGET)"
-	@echo "Build Type:  $(BUILD_TYPE)"
-	@echo "Commit:      $(GIT_COMMIT)"
-	@echo "Version:     $(VERSION)"
-	@echo "Dirty:       $(GIT_DIRTY)"
-
+info:
+	@echo "Image:        $(IMAGE)"
+	@echo "Target:       $(TARGET)"
+	@echo "Build Type:   $(BUILD_TYPE)"
+	@echo "Commit:       $(GIT_COMMIT)"
+	@echo "Version:      $(VERSION)"
+	@echo "Dirty:        $(GIT_DIRTY)"
+	@echo "Ubuntu:       $(UBUNTU_VERSION)"
+	@echo "Python:       $(PYTHON_VERSION)"
+	@echo "VS Code:      $(VSCODE_VERSION)"
+	@echo "CUDA:         $(CUDA_MAJOR).$(CUDA_MINOR)"
 
 build:
 	docker build \
@@ -61,30 +61,26 @@ build:
 		.
 
 push: build
-	docker push $(IMAGE_NAME):$(IMAGE_TAG)
-
+	docker push $(IMAGE)
 
 build-cpu:
 	$(MAKE) build BUILD_TYPE=cpu
 
-
 build-gpu:
 	$(MAKE) build BUILD_TYPE=gpu
 
-
-push-cpu: 
+push-cpu:
 	$(MAKE) push BUILD_TYPE=cpu
-
 
 push-gpu:
 	$(MAKE) push BUILD_TYPE=gpu
-
 
 run:
 	docker run \
 		-it \
 		--rm \
 		--net=host \
+		--name=test-ds-containers \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		$(ARGS) \
 		$(IMAGE) \

@@ -47,7 +47,7 @@ echo "[cont-init] Writing default settings.json"
 cat > "${SETTINGS_FILE}" << 'EOF'
 {
     "workbench.editor.useModal": "off",
-    "workbench.colorTheme": "Dark Modern",
+    "workbench.colorTheme": "Light Modern",
     "workbench.iconTheme": "vscode-icons",
 
     "window.menuBarVisibility": "classic",
