@@ -32,9 +32,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     environment: docker-hub
-    strategy:
-      matrix:
-        build_type: [cpu, gpu]
 
     env:
       UBUNTU_VERSION: ${{ inputs.ubuntu_tag }}
@@ -55,10 +52,18 @@ jobs:
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | \
           docker login -u "${{ vars.DOCKERHUB_USERNAME }}" --password-stdin
 
-      - name: Show build configuration
+      - name: Show CPU build configuration
         run: |
-          make -e info BUILD_TYPE=${{ matrix.build_type }}
+          make -e info BUILD_TYPE=cpu
 
-      - name: Build and Push Image
+      - name: Build and Push CPU Image
         run: |
-          make -e push-${{ matrix.build_type }} BUILD_TYPE=${{ matrix.build_type }}
+          make -e push-cpu
+
+      - name: Show GPU build configuration
+        run: |
+          make -e info BUILD_TYPE=gpu
+      
+      - name: Build and Push GPU Image
+        run: |
+          make -e push-gpu
