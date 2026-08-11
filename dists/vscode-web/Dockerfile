@@ -1,17 +1,3 @@
-ARG BUILD_TYPE=cpu
-
-ARG UBUNTU_VERSION=22.04
-ARG PYTHON_VERSION
-ARG VSCODE_VERSION
-
-ARG GIT_REPO
-ARG GIT_COMMIT
-ARG BUILD_DATE
-ARG VERSION
-
-ARG CUDA_MAJOR
-ARG CUDA_MINOR
-
 # =============================================================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS base
 
@@ -37,7 +23,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     vim nano tmux bash bash-completion gnupg gpg locales lsb-release tzdata \
     tini telnet traceroute net-tools iputils-ping procps dnsutils lsof strace \
     binutils tree jq less rsync sed xxd zip unzip tar gzip bzip2 xz-utils p7zip-full \
-    make cmake pkg-config fuse nodejs python3-dev docker-cli gettext nginx s3fs \
+    make cmake pkg-config fuse python3-dev docker-cli gettext nginx s3fs \
     termtris ttyd ripgrep file acl psmisc socat apt-utils apt-transport-https \
     iproute2 iptables nftables nmap tcpdump whois netcat-openbsd mtr-tiny \
     unrar perl inotify-tools mold clang llvm lld htop nvtop numactl linux-tools-common linux-tools-generic graphviz  \
