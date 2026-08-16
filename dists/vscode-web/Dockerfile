@@ -33,7 +33,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     autotools-dev gdb libc6-dbg gfortran libboost-all-dev libeigen3-dev \
     libicu-dev libbz2-dev zlib1g-dev pciutils libffi-dev libssl-dev \
     build-essential gcc g++ make cmake ninja-build pkg-config python3-dev \
-    libncurses-dev libreadline-dev libsqlite3-dev liblzma-dev ccache patchelf
+    libncurses-dev libreadline-dev libsqlite3-dev liblzma-dev ccache patchelf quilt trash-cli
 
 ENV TZ=Asia/Kolkata
 RUN ln -fs /usr/share/zoneinfo/${TZ} /etc/localtime && \
@@ -142,34 +142,13 @@ ARG VSCODE_VERSION
 
 ENV VSCODE_VERSION=${VSCODE_VERSION}
 
-RUN install -d /opt/vscode-data/ /opt/vscode-server/ \
-    && wget -qO /opt/vscode-data/cli_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/cli-linux-x64/stable \
-    && tar -xzf /opt/vscode-data/cli_${VSCODE_VERSION}.tar.gz -C /tmp \
-    && sudo install -m 0755 -o root -g root /tmp/code /usr/bin/code \
-    && VSCODE_GIT_HASH="$(code --version | sed -nE 's/.*\(commit ([0-9a-f]{40})\).*/\1/p')" \
-    && test -n "${VSCODE_GIT_HASH}" \
-    && printf '%s\n' "${VSCODE_GIT_HASH}" > /opt/vscode-data/VSCODE_GIT_HASH \
-    && rm /tmp/code
-
-RUN install -d /opt/vscode-data/ /opt/vscode-web-server/cli/serve-web \
-    && VSCODE_GIT_HASH="$(cat /opt/vscode-data/VSCODE_GIT_HASH)" \
-    && wget -qO /opt/vscode-data/web_server_${VSCODE_GIT_HASH}.tar.gz https://update.code.visualstudio.com/commit:${VSCODE_GIT_HASH}/server-linux-x64-web/stable \
-    && tar -xzf /opt/vscode-data/web_server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-web-server/cli/serve-web/ \
-    && mv /opt/vscode-web-server/cli/serve-web/vscode-server-linux-x64-web /opt/vscode-web-server/cli/serve-web/${VSCODE_GIT_HASH}
-
-RUN install -d /opt/vscode-server/bin \
-    && VSCODE_GIT_HASH="$(cat /opt/vscode-data/VSCODE_GIT_HASH)" \
-    && wget -qO /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz https://update.code.visualstudio.com/commit:${VSCODE_GIT_HASH}/server-linux-x64/stable \
-    && tar -xzf /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-server/bin/ \
-    && mv /opt/vscode-server/bin/vscode-server-linux-x64 /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
-    && chmod -R a+rwX /opt/vscode-server/ \
-    && tar -czf /opt/vscode-data/server_${VSCODE_GIT_HASH}.tar.gz -C /opt/vscode-server/ /opt/vscode-server/bin/${VSCODE_GIT_HASH} \
-    && code version use --install-dir /opt/vscode-server/bin/${VSCODE_GIT_HASH}/bin/code-server stable
+RUN install -d /opt/vscode-data/ /opt/vscode-web-server/ \
+    && wget -qO /opt/vscode-data/web_server_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/server-linux-x64-web/stable \
+    && tar -xzf /opt/vscode-data/web_server_${VSCODE_VERSION}.tar.gz -C /opt/vscode-web-server/ --strip-components=1 \
+    && wget -qO /opt/vscode-data/server_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/server-linux-x64/stable
 
 COPY dists/vscode-web/vscode-extensions.txt /opt/vscode-data/extensions.list
-RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code --install-extension {} --extensions-dir /opt/vscode-web-server/extensions/ || true' \
-    && cp -r /opt/vscode-web-server/extensions/ /opt/vscode-server/extensions/ \
-    && tar -czf /opt/vscode-data/vscode-server-with-extensions.tar.gz -C /opt/vscode-server/ /opt/vscode-server/
+RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c '/opt/vscode-web-server/bin/code-server --install-extension {} --extensions-dir /opt/vscode-web-server/extensions/ || true'
 
 
 # =============================================================================================================
@@ -197,6 +176,7 @@ RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     && VIRTUAL_ENV=/opt/venv uv run jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix \
     && VIRTUAL_ENV=/opt/venv uv run jupyter contrib nbextension install --sys-prefix \
     && xargs -a /opt/notebook-data/extensions.list -I {} sh -c 'VIRTUAL_ENV=/opt/venv uv run jupyter nbextension enable {} --sys-prefix || true' \
+    && sudo install -D /opt/venv/bin/jupyter /usr/local/bin/jupyter \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 # =============================================================================================================
@@ -219,7 +199,7 @@ ENV S6_KEEP_ENV=1
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --insecure -fsSL "http://127.0.0.1:8080/health" || exit 1
+    CMD curl --insecure -kfsSL "http://127.0.0.1:8080/health" || exit 1
 
 
 # =============================================================================================================

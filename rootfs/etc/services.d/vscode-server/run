@@ -35,6 +35,6 @@ fdmove -c 2 1
 
 # Execute vscode server
 ifelse { eltest "$CLEANED_PROXY_PREFIX" =~ ^$ } {
-    code serve-web --host=0.0.0.0 --port=8887 --without-connection-token --cli-data-dir=/opt/vscode-web-server/cli --server-data-dir=/opt/vscode-web-server/ --disable-telemetry --commit-id=${VSCODE_GIT_HASH} --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
+    /opt/vscode-web-server/bin/code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-web-server/ --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
 }
-code serve-web --host=0.0.0.0 --port=8887 --without-connection-token --cli-data-dir=/opt/vscode-web-server/cli --server-data-dir=/opt/vscode-web-server/ --server-base-path=${CLEANED_PROXY_PREFIX} --disable-telemetry --commit-id=${VSCODE_GIT_HASH} --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
+/opt/vscode-web-server/bin/code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-web-server/ --server-base-path=${CLEANED_PROXY_PREFIX} --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
