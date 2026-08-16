@@ -9,8 +9,8 @@ echo "[cont-init] Configuring VS Code Server..."
 # Config
 # --------------------------------------------------
 
-VSCODE_DATA_DIR="${VSCODE_DATA_DIR:-/opt/vscode-web-server/data}"
-VSCODE_EXTENSIONS_DIR="${VSCODE_EXTENSIONS_DIR:-/opt/vscode-web-server/extensions}"
+VSCODE_DATA_DIR="${VSCODE_DATA_DIR:-/opt/vscode-data/data}"
+VSCODE_EXTENSIONS_DIR="${VSCODE_EXTENSIONS_DIR:-/opt/vscode-data/extensions}"
 
 FIX_VSCODE_PERMS_RECURSIVE="${FIX_VSCODE_PERMS_RECURSIVE:-0}"
 RESET_VSCODE_SETTINGS="${RESET_VSCODE_SETTINGS:-0}"

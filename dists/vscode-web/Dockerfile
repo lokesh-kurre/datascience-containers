@@ -193,7 +193,7 @@ RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-c
     && xargs -a /opt/notebook-data/python-executables.list -I {} sh -c 'update-alternatives --install /usr/local/bin/{} {} /opt/venv/bin/{} 1 || true' \
     && update-alternatives --install /usr/local/bin/code-server code-server /opt/vscode-web-server/bin/code-server 1
 
-RUN rm -rf /root/.cache /home/jovyan/*
+RUN rm -rf /root/.cache /home/jovyan/* /home/jovyan/.profile /home/jovyan/.bashrc /home/jovyan/.bash_logout
 
 RUN find /etc/cont-init.d/ /etc/services.d/ -type f -exec chmod +x {} +
 
