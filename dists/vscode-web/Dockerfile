@@ -158,8 +158,8 @@ RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code-server --install
 # =============================================================================================================
 FROM base-python AS base-python-codeserver-jupyter
 
-COPY --from=vscodeserver-assets /opt/vscode-data/ /opt/vscode-data/
-COPY --from=vscodeserver-assets /opt/vscode-web-server/ /opt/vscode-web-server/
+COPY --from=vscodeserver-assets --chown=jovyan:shared /opt/vscode-data/ /opt/vscode-data/
+COPY --from=vscodeserver-assets --chown=jovyan:shared /opt/vscode-web-server/ /opt/vscode-web-server/
 
 RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="setuptools[core]<81.0.0 build wheel pip" \
@@ -212,7 +212,7 @@ ARG CUDA_MAJOR
 ARG CUDA_MINOR
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}
 
-COPY --from=cuda-builder /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_VERSION}
+COPY --from=cuda-builder --chown=jovyan:shared /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_VERSION}
 
 RUN ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda && \
     ln -sfn /usr/local/cuda-${CUDA_VERSION} /usr/local/cuda-${CUDA_MAJOR}
