@@ -45,13 +45,14 @@ echo "[cont-init] SERVE_DIRECTORY=${SERVE_DIRECTORY}"
 # -----------------------------
 
 # Export for confd
-# Read nameserver from /etc/resolv.conf at time of nginx config generation
-NGINX_RESOLVER="$(grep -m1 '^nameserver' /etc/resolv.conf 2>/dev/null | awk '{print $2}')"
+# Read all nameservers from /etc/resolv.conf at time of nginx config generation
+# Ignore lines starting with # and strip inline comments
+NGINX_RESOLVER="$(grep '^nameserver' /etc/resolv.conf 2>/dev/null | sed 's/#.*//' | awk '{print $2}' | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
 
 if [ -n "${NGINX_RESOLVER}" ]; then
-    echo "[cont-init] Using nameserver: ${NGINX_RESOLVER}"
+    echo "[cont-init] Using nameservers: ${NGINX_RESOLVER}"
 else
-    echo "[cont-init] WARNING: No nameserver found in /etc/resolv.conf"
+    echo "[cont-init] WARNING: No nameservers found in /etc/resolv.conf"
     NGINX_RESOLVER=""
 fi
 

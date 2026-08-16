@@ -190,7 +190,8 @@ COPY rootfs/ /
 RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
     && UV_CACHE_DIR=/tmp/uv-cache-root UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
     -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt \
-    && xargs -a /opt/notebook-data/python-executables.list -I {} sh -c 'update-alternatives --install /usr/local/bin/{} {} /opt/venv/bin/{} 1 || true'
+    && xargs -a /opt/notebook-data/python-executables.list -I {} sh -c 'update-alternatives --install /usr/local/bin/{} {} /opt/venv/bin/{} 1 || true' \
+    && update-alternatives --install /usr/local/bin/code-server code-server /opt/vscode-web-server/bin/code-server 1
 
 RUN rm -rf /root/.cache /home/jovyan/*
 
