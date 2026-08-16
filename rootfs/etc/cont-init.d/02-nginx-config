@@ -44,9 +44,21 @@ echo "[cont-init] SERVE_DIRECTORY=${SERVE_DIRECTORY}"
 # Export for confd
 # -----------------------------
 
+# Export for confd
+# Read nameserver from /etc/resolv.conf at time of nginx config generation
+NGINX_RESOLVER="$(grep -m1 '^nameserver' /etc/resolv.conf 2>/dev/null | awk '{print $2}')"
+
+if [ -n "${NGINX_RESOLVER}" ]; then
+    echo "[cont-init] Using nameserver: ${NGINX_RESOLVER}"
+else
+    echo "[cont-init] WARNING: No nameserver found in /etc/resolv.conf"
+    NGINX_RESOLVER=""
+fi
+
 export SERVICE_PORT PROXY_PREFIX \
     SERVE_DIRECTORY \
-    ENABLE_CONNECT_PROXY
+    ENABLE_CONNECT_PROXY \
+    NGINX_RESOLVER
 
 
 # -----------------------------

@@ -10,4 +10,4 @@ opencv-contrib-python-headless==4.8.1.78
 
 ### other packages
 onnx==1.15.0
-onnxruntime==1.18.1
+onnxruntime==1.18.0

@@ -205,9 +205,14 @@ export GIT_PS1_SHOWDIRTYSTATE=1
 export GIT_PS1_SHOWUNTRACKEDFILES=1
 
 fix_path() {
-    case "$1" in
-        "$HOME"*) printf "~%s" "${1#$HOME}" ;;
-        *) printf "%s" "$1" ;;
+    local path="$1"
+    # Remove trailing slashes (except for root)
+    path="${path%/}"
+    [ -z "$path" ] && path="/"
+    
+    case "$path" in
+        "$HOME"*) printf "~%s" "${path#$HOME}" ;;
+        *) printf "%s" "$path" ;;
     esac
 }
 
