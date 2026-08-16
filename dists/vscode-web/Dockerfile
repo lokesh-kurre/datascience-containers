@@ -157,12 +157,8 @@ RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c '/opt/vscode-web-serve
 # =============================================================================================================
 FROM base-python AS base-python-codeserver-jupyter
 
-COPY --from=vscodeserver-assets /usr/bin/code /usr/bin/code
 COPY --from=vscodeserver-assets /opt/vscode-data/ /opt/vscode-data/
 COPY --from=vscodeserver-assets /opt/vscode-web-server/ /opt/vscode-web-server/
-COPY --from=vscodeserver-assets /opt/vscode-server/ /opt/vscode-server/
-
-RUN sudo ln -sf /opt/vscode-server/ /root/.vscode-server
 
 RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="setuptools[core]<81.0.0 build wheel pip" \
