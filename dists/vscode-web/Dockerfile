@@ -148,10 +148,11 @@ ENV VSCODE_VERSION=${VSCODE_VERSION}
 RUN install -d /opt/vscode-data/ /opt/vscode-web-server/ \
     && wget -qO /opt/vscode-data/web_server_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/server-linux-x64-web/stable \
     && tar -xzf /opt/vscode-data/web_server_${VSCODE_VERSION}.tar.gz -C /opt/vscode-web-server/ --strip-components=1 \
-    && wget -qO /opt/vscode-data/server_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/server-linux-x64/stable
+    && wget -qO /opt/vscode-data/server_${VSCODE_VERSION}.tar.gz https://update.code.visualstudio.com/${VSCODE_VERSION}/server-linux-x64/stable \
+    && sudo update-alternatives --install /usr/local/bin/code-server code-server /opt/vscode-web-server/bin/code-server 1
 
 COPY dists/vscode-web/vscode-extensions.txt /opt/vscode-data/extensions.list
-RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c '/opt/vscode-web-server/bin/code-server --install-extension {} --extensions-dir /opt/vscode-web-server/extensions/ || true'
+RUN xargs -a /opt/vscode-data/extensions.list -I {} sh -c 'code-server --install-extension {} --extensions-dir /opt/vscode-data/extensions/ || true'
 
 
 # =============================================================================================================
@@ -166,6 +167,7 @@ RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 COPY dists/vscode-web/notebook-extensions.txt /opt/notebook-data/extensions.list
+COPY dists/vscode-web/python-executables.txt /opt/notebook-data/python-executables.list
 RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     DEPS="notebook==6.5.7" \
     && UV_CACHE_DIR=/tmp/uv-cache-jovyan UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv \
@@ -175,7 +177,7 @@ RUN --mount=type=cache,target=/tmp/uv-cache-jovyan,uid=1000,gid=1000  \
     && VIRTUAL_ENV=/opt/venv uv run jupyter nbextension install --py jupyter_nbextensions_configurator --sys-prefix \
     && VIRTUAL_ENV=/opt/venv uv run jupyter contrib nbextension install --sys-prefix \
     && xargs -a /opt/notebook-data/extensions.list -I {} sh -c 'VIRTUAL_ENV=/opt/venv uv run jupyter nbextension enable {} --sys-prefix || true' \
-    && sudo install -D /opt/venv/bin/jupyter /usr/local/bin/jupyter \
+    && xargs -a /opt/notebook-data/python-executables.list -I {} sh -c 'sudo update-alternatives --install /usr/local/bin/{} {} /opt/venv/bin/{} 1 || true' \
     && printf '%s\n' ${DEPS} >> /opt/venv/pinned
 
 # =============================================================================================================
@@ -187,7 +189,8 @@ COPY rootfs/ /
 
 RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
     && UV_CACHE_DIR=/tmp/uv-cache-root UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
-    -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt
+    -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt \
+    && xargs -a /opt/notebook-data/python-executables.list -I {} sh -c 'update-alternatives --install /usr/local/bin/{} {} /opt/venv/bin/{} 1 || true'
 
 RUN rm -rf /root/.cache /home/jovyan/*
 

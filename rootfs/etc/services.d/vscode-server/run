@@ -28,13 +28,12 @@ export HOME ${SERVE_DIRECTORY}
 
 # Format and clean up the URL base path prefix
 backtick -n -E CLEANED_PROXY_PREFIX { pipeline { /usr/bin/bash -c "echo ${PROXY_PREFIX:=${NB_PREFIX}}" } sed -E "s|/+|/|g; s|/$||" }
-backtick -n -E -D "" VSCODE_GIT_HASH { cat /opt/vscode-data/VSCODE_GIT_HASH }
 
 foreground { s6-echo "INFO: starting vscode-server..." }
 fdmove -c 2 1   
 
 # Execute vscode server
 ifelse { eltest "$CLEANED_PROXY_PREFIX" =~ ^$ } {
-    /opt/vscode-web-server/bin/code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-web-server/ --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
+    code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-data/ --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
 }
-/opt/vscode-web-server/bin/code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-web-server/ --server-base-path=${CLEANED_PROXY_PREFIX} --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
+code-server --host=0.0.0.0 --port=8887 --without-connection-token --accept-server-license-terms --server-data-dir=/opt/vscode-data/ --server-base-path=${CLEANED_PROXY_PREFIX} --disable-telemetry --default-folder=${SERVE_DIRECTORY} --socket-path=/var/run/shared/vscode.sock
