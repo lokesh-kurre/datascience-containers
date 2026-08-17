@@ -1,5 +1,5 @@
-ARG UBUNTU_VERSION
-ARG BUILD_TYPE
+ARG UBUNTU_VERSION=22.04
+ARG BUILD_TYPE=cpu
 
 # =============================================================================================================
 FROM ubuntu:${UBUNTU_VERSION} AS base
@@ -91,13 +91,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # =============================================================================================================
 FROM base AS base-python
 
-ARG PYTHON_VERSION
+ARG PYTHON_VERSION=3.11
 
 LABEL org.opencontainers.image.python.version=${PYTHON_VERSION}
 
-RUN groupadd shared \
+RUN groupdel "$(getent group 1000 | cut -d: -f1)" 2>/dev/null || true \
+    && userdel -r "$(getent passwd 1000 | cut -d: -f1)" 2>/dev/null || true \
+    && groupadd -g 1000 shared \
     && useradd -m -d /home/jovyan -u 1000 -g shared -G root --shell /bin/bash jovyan \
-    && usermod -aG shared jovyan \
     && echo "jovyan ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/jovyan \
     && chmod 0440 /etc/sudoers.d/jovyan
 
@@ -108,7 +109,10 @@ RUN install -g shared -m 2775 -d /var/run/shared /opt /opt/share \
 RUN curl -Ls https://astral.sh/uv/install.sh |  \
     UV_INSTALL_DIR=/usr/local/bin bash
 
-ENV PATH=/opt/bin:$PATH
+ENV PATH=/opt/uv/bin:$PATH \
+    UV_PYTHON_INSTALL_DIR=/opt/uv/ \
+    UV_PYTHON_BIN_DIR=/opt/uv/bin
+
 RUN for v in $(seq 8 14); do \
     uv python install "3.${v}" || true; \
     done
@@ -202,7 +206,7 @@ ENV S6_KEEP_ENV=1
 ENTRYPOINT ["/init"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --insecure -kfsSL "http://127.0.0.1:8080/health" || exit 1
+    CMD curl --insecure -fsSL "http://127.0.0.1:8080/health" || exit 1
 
 
 # =============================================================================================================

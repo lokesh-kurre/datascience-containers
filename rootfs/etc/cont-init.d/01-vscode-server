@@ -13,11 +13,6 @@ VSCODE_DATA_DIR="${VSCODE_DATA_DIR:-/opt/vscode-data/data}"
 VSCODE_EXTENSIONS_DIR="${VSCODE_EXTENSIONS_DIR:-/opt/vscode-data/extensions}"
 
 FIX_VSCODE_PERMS_RECURSIVE="${FIX_VSCODE_PERMS_RECURSIVE:-0}"
-RESET_VSCODE_SETTINGS="${RESET_VSCODE_SETTINGS:-0}"
-
-SETTINGS_DIR="${VSCODE_DATA_DIR}/Machine"
-SETTINGS_FILE="${SETTINGS_DIR}/settings.json"
-
 
 # --------------------------------------------------
 # Create directories
@@ -29,9 +24,9 @@ install -d \
     -o jovyan \
     -g shared \
     -m 775 \
-    "${SETTINGS_DIR}" \
     "${VSCODE_EXTENSIONS_DIR}" \
     "${VSCODE_DATA_DIR}/logs" \
+    "${VSCODE_DATA_DIR}/Machine" \
     "${VSCODE_DATA_DIR}/User" \
     "${VSCODE_DATA_DIR}/workspaceStorage"
 
@@ -40,17 +35,13 @@ install -d \
 # Settings
 # --------------------------------------------------
 
-if [[ ! -f "${SETTINGS_FILE}" || "${RESET_VSCODE_SETTINGS}" == "1" ]]; then
-
 echo "[cont-init] Writing default settings.json"
 
-cat > "${SETTINGS_FILE}" << 'EOF'
+cat > "${VSCODE_DATA_DIR}/Machine/settings.json" << 'EOF'
 {
     "workbench.editor.useModal": "off",
     "workbench.colorTheme": "Light Modern",
     "workbench.iconTheme": "vscode-icons",
-
-    "window.menuBarVisibility": "classic",
 
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
@@ -58,7 +49,7 @@ cat > "${SETTINGS_FILE}" << 'EOF'
     "editor.wordWrap": "on",
 
     "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 2000,
+    "files.autoSaveDelay": 1000,
     "files.exclude": {
         "**/.venv": true
     },
@@ -71,36 +62,42 @@ cat > "${SETTINGS_FILE}" << 'EOF'
 
     "terminal.integrated.defaultProfile.linux": "bash",
 
-    "python.terminal.activateEnvironment": true,
-    "python.terminal.activateEnvInCurrentTerminal": true,
-    "python.terminal.useEnvFile": true,
-
     "notebook.lineNumbers": "on",
     "notebook.output.scrolling": true,
     "notebook.output.wordWrap": true,
 
     "git.confirmSync": false,
 
+    "extensions.ignoreRecommendations": true,
+
+    "telemetry.feedback.enabled": false,
+    "telemetry.editStats.enabled": false,
+
+    "gitlens.telemetry.enabled": false,
+    "gitlens.ai.enabled": false
+}
+EOF
+
+cat > "${VSCODE_DATA_DIR}/User/settings.json" << 'EOF'
+{
+    "window.menuBarVisibility": "classic",
+
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.terminal.useEnvFile": true,
+
     "extensions.autoCheckUpdates": false,
     "extensions.autoUpdate": "off",
-    "extensions.ignoreRecommendations": true,
 
     "update.mode": "none",
     "update.showReleaseNotes": false,
 
     "telemetry.telemetryLevel": "off",
-    "telemetry.feedback.enabled": false,
-    "telemetry.editStats.enabled": false,
-
-    "gitlens.telemetry.enabled": false,
-    "gitlens.ai.enabled": false,
 
     "marimo.telemetry": false,
     "jsonFlow.enable": false
 }
 EOF
-
-fi
 
 
 # --------------------------------------------------
@@ -146,14 +143,12 @@ else
     chown jovyan:shared \
         "${VSCODE_DATA_DIR}" \
         "${VSCODE_EXTENSIONS_DIR}" \
-        "${SETTINGS_FILE}" \
         "${ARGV_FILE}" \
         2>/dev/null || true
 
     chmod ug+rwX,o-rwx \
         "${VSCODE_DATA_DIR}" \
         "${VSCODE_EXTENSIONS_DIR}" \
-        "${SETTINGS_FILE}" \
         "${ARGV_FILE}" \
         2>/dev/null || true
 
