@@ -191,6 +191,11 @@ USER root
 
 COPY rootfs/ /
 
+RUN getfacl /opt \
+    && install -g shared -m 2775 -d /var/run/shared /opt /opt/share \
+    && setfacl -m d:g:shared:rwx /opt /var/run/shared \
+    && getfacl /opt
+
 RUN --mount=type=cache,target=/tmp/uv-cache-root echo "-c /opt/requirements/00-constraints.txt" >> /opt/venv/pinned \
     && UV_CACHE_DIR=/tmp/uv-cache-root UV_CONSTRAINT=/opt/venv/pinned VIRTUAL_ENV=/opt/venv uv pip install --no-build-isolation \
     -r /opt/requirements/00-general-requirements.txt -r /opt/requirements/01-cpu-requirements.txt \

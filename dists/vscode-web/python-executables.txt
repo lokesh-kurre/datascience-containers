@@ -10,3 +10,5 @@ mypy
 tabulate
 tqdm
 uvicorn
+graphify
+hermes

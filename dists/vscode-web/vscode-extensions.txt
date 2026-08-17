@@ -1,5 +1,6 @@
 AndrewButson.github-copilot-llm-gateway
 anthropic.claude-code
+Continue.continue
 christian-kohler.path-intellisense
 cweijan.vscode-ssh
 davidanson.vscode-markdownlint
