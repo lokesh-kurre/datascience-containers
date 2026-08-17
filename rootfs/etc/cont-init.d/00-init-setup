@@ -117,10 +117,16 @@ HISTCONTROL=ignoreboth:erasedups
 HISTSIZE=5000
 HISTFILESIZE=10000
 
+bind '"\C-l": clear-screen'
+bind '"\er": clear-screen'
+
 shopt -s histappend
 shopt -s checkwinsize
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 
 if [ -z "${_ENV_INFO_SHOWN:-}" ]; then
 export _ENV_INFO_SHOWN=1
@@ -177,6 +183,9 @@ command -v kubectl >/dev/null 2>&1 &&
 command -v uv >/dev/null 2>&1 &&
     source <(uv generate-shell-completion bash 2>/dev/null)
 
+command -v fzf >/dev/null 2>&1 &&
+    source <(fzf --bash 2>/dev/null)
+
 [ -f /etc/container-prompt.sh ] &&
     source /etc/container-prompt.sh
 
@@ -206,7 +215,6 @@ export GIT_PS1_SHOWUNTRACKEDFILES=1
 
 fix_path() {
     local path="$1"
-    # Remove trailing slashes (except for root)
     path="${path%/}"
     [ -z "$path" ] && path="/"
     
@@ -226,13 +234,31 @@ prompt_path() {
     fix_path "$PWD"
 }
 
-prompt_git() {
-    declare -F __git_ps1 >/dev/null &&
-        __git_ps1 " git:(%s)"
+build_container_prompt() {
+    local venv=$(prompt_venv)
+    local ppath=$(prompt_path)
+    
+    # Force capture of the raw Git string completely independent of PS1
+    local pgit=""
+    if declare -F __git_ps1 >/dev/null; then
+        # Running inside a subshell capturing to a variable strips the automatic PS1 prepend behavior
+        pgit=$(PS1="X" __git_ps1 " git:(%s)")
+        # Clean up any residual markers if present
+        pgit="${pgit#X}"
+    fi
+
+    # Explicitly wrapped color boundaries
+    local CYAN="\[\033[01;36m\]"
+    local MAGENTA="\[\033[01;35m\]"
+    local GREEN="\[\033[01;32m\]"
+    local YELLOW="\[\033[01;33m\]"
+    local RESET="\[\033[00m\]"
+
+    # Perfect layout order alignment:
+    PS1="${CYAN}${venv}${RESET} ${MAGENTA}${ppath}${RESET}\n ➜ ${GREEN}\u@\h${RESET}${YELLOW}${pgit}${RESET} "
 }
 
-PS1='\[\033[01;36m\]$(prompt_venv)\[\033[00m\] \[\033[01;35m\]$(prompt_path)\[\033[00m\]
- ➜ \[\033[01;32m\]\u@\h\[\033[00m\]\[\033[01;33m\]$(prompt_git)\[\033[00m\] '
+PROMPT_COMMAND=build_container_prompt
 
 EOF
 
@@ -245,6 +271,10 @@ chmod 644 /etc/container-prompt.sh
 echo "[cont-init] Installing global bash drop-ins..."
 
 install -d -o root -g root -m 755 /etc/bash.bashrc.d
+
+git config --system init.defaultBranch main
+git config --system credential.helper "cache --timeout=15"
+git config --system core.autocrlf input
 
 # ==================================================
 # uv wrapper

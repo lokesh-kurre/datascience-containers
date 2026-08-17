@@ -82,6 +82,9 @@ run:
 		--net=host \
 		--name=test-ds-containers \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v ./rootfs/etc/cont-init.d:/etc/cont-init.d \
+		-v ./rootfs/etc/confd:/etc/confd \
+		-v ./rootfs/etc/services.d:/etc/services.d \
 		$(ARGS) \
 		$(IMAGE) \
 		$(CMD)

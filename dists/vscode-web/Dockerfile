@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     echo "path-exclude=/usr/share/man/*" > /etc/dpkg/dpkg.cfg.d/01_nodoc \
     && apt-get update && apt-get install -y --no-install-recommends \
-    sudo ca-certificates openssl openssh-client curl wget git git-lfs \
+    sudo ca-certificates openssl openssh-client curl wget git git-lfs fzf \
     vim nano tmux bash bash-completion gnupg gpg locales lsb-release tzdata \
     tini telnet traceroute net-tools iputils-ping procps dnsutils lsof strace \
     binutils tree jq less rsync sed xxd zip unzip tar gzip bzip2 xz-utils p7zip-full \
