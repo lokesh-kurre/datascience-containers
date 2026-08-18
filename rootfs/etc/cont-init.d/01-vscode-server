@@ -74,6 +74,7 @@ cat > "${VSCODE_DATA_DIR}/Machine/settings.json" << 'EOF'
     "telemetry.editStats.enabled": false,
 
     "gitlens.telemetry.enabled": false,
+    "marimo.telemetry": false,
     "gitlens.ai.enabled": false
 }
 EOF
@@ -94,7 +95,6 @@ cat > "${VSCODE_DATA_DIR}/User/settings.json" << 'EOF'
 
     "telemetry.telemetryLevel": "off",
 
-    "marimo.telemetry": false,
     "jsonFlow.enable": false
 }
 EOF
@@ -143,6 +143,8 @@ else
     chown jovyan:shared \
         "${VSCODE_DATA_DIR}" \
         "${VSCODE_EXTENSIONS_DIR}" \
+        "${VSCODE_DATA_DIR}/Machine/settings.json" \
+        "${VSCODE_DATA_DIR}/User/settings.json" \
         "${ARGV_FILE}" \
         2>/dev/null || true
 
