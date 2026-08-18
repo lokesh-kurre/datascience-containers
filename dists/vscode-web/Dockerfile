@@ -109,9 +109,9 @@ RUN install -g shared -m 2775 -d /var/run/shared /opt /opt/share \
 RUN curl -Ls https://astral.sh/uv/install.sh |  \
     UV_INSTALL_DIR=/usr/local/bin bash
 
-ENV PATH=/opt/uv/bin:$PATH \
-    UV_PYTHON_INSTALL_DIR=/opt/uv/ \
-    UV_PYTHON_BIN_DIR=/opt/uv/bin
+ENV PATH=/opt/bin:$PATH \
+    UV_PYTHON_INSTALL_DIR=/opt/share/uv/python \
+    UV_PYTHON_BIN_DIR=/opt/bin
 
 RUN for v in $(seq 8 14); do \
     uv python install "3.${v}" || true; \
