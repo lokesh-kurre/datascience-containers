@@ -214,14 +214,15 @@ export GIT_PS1_SHOWDIRTYSTATE=1
 export GIT_PS1_SHOWUNTRACKEDFILES=1
 
 fix_path() {
-    local path="$1"
-    path="${path%/}"
-    [ -z "$path" ] && path="/"
-    
-    case "$path" in
-        "$HOME"*) printf "~%s" "${path#$HOME}" ;;
-        *) printf "%s" "$path" ;;
-    esac
+  local path="${1%/}"
+  local home="${HOME%/}"
+  [ -z "$path" ] && path="/"
+
+  case "$path" in
+    "$home")   printf "~" ;;
+    "$home"/*) printf "~%s" "${path#"$home"}" ;;
+    *)         printf "%s" "$path" ;;
+  esac
 }
 
 prompt_venv() {
