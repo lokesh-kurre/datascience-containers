@@ -33,4 +33,4 @@ foreground { s6-echo "INFO: starting ttyd-server..." }
 fdmove -c 2 1
 
 # Execute ttyd
-ttyd --port=8886 --interface=/var/run/shared/ttyd.sock --cwd=${SERVE_DIRECTORY} --url-arg --base-path=${CLEANED_PROXY_PREFIX}/ttyd/ /bin/bash
+ttyd --port=8886 --interface=/var/run/shared/ttyd.sock --writable --cwd=${SERVE_DIRECTORY} --url-arg --base-path=${CLEANED_PROXY_PREFIX}/ttyd/ /bin/bash
